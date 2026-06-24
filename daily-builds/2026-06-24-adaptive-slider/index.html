@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#f4f4f5" />
+<title>Adaptive Slider — Day 1</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:#f4f4f5;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
+    display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  .wrap { display:flex; flex-direction:column; align-items:center; gap:clamp(20px,5vw,26px); width:100%; max-width:560px; }
+
+  /* ---- themes (applied to .card) ---- */
+  .card[data-theme="light"]  { --bg:#ffffff; --track:#ededed; --label:#9a9a9a; --hint:#bcbcbc; --dotg:#cdcdcd;
+    --ring:0 0 0 1px rgba(17,17,17,.06), 0 1px 1px rgba(17,17,17,.04), 0 14px 30px -22px rgba(17,17,17,.22); }
+  .card[data-theme="dark"]   { --bg:#16181d; --track:#2a2d35; --label:#8b8f99; --hint:#5a5e68; --dotg:#3a3e47;
+    --ring:0 0 0 1px rgba(255,255,255,.08), 0 1px 1px rgba(0,0,0,.4), 0 24px 48px -26px rgba(0,0,0,.78); }
+  .card[data-theme="sand"]   { --bg:#f5ede1; --track:#e6dac7; --label:#a4937c; --hint:#c4b39a; --dotg:#d6c7af;
+    --ring:0 0 0 1px rgba(80,60,30,.09), 0 1px 1px rgba(80,60,30,.05), 0 14px 30px -22px rgba(80,60,30,.26); }
+  .card[data-theme="indigo"] { --bg:#1b1d3a; --track:#2e3160; --label:#9093c0; --hint:#5b5e90; --dotg:#3d4180;
+    --ring:0 0 0 1px rgba(255,255,255,.10), 0 1px 1px rgba(0,0,0,.4), 0 24px 48px -26px rgba(10,8,40,.82); }
+
+  .card {
+    width:100%; max-width:520px; background:var(--bg); border-radius:clamp(24px,5vw,34px); box-shadow:var(--ring);
+    padding:clamp(34px,8vw,56px) clamp(26px,7vw,56px) clamp(38px,9vw,60px);
+    display:flex; flex-direction:column; align-items:center; gap:clamp(24px,6vw,34px);
+    transition:background .35s ease, box-shadow .35s ease, color .35s ease;
+    view-transition-name:card;
+  }
+  /* magical circular reveal from the clicked swatch */
+  ::view-transition-group(card){ animation-duration:.6s; }
+  ::view-transition-old(card){ animation:none; }
+  ::view-transition-new(card){ animation:cardReveal .6s cubic-bezier(.3,0,.15,1) both; }
+  @keyframes cardReveal {
+    from { clip-path: circle(0px at var(--cx,50%) var(--cy,50%)); }
+    to   { clip-path: circle(var(--cr,150%) at var(--cx,50%) var(--cy,50%)); }
+  }
+
+  .label { text-transform:uppercase; letter-spacing:.22em; font-size:clamp(11px,3vw,13px); font-weight:600; color:var(--label); transition:color .35s ease; }
+
+  /* ---- rolling number ---- */
+  .amount { display:flex; align-items:center; height:1.18em; font-weight:800; font-size:clamp(46px,13vw,74px); letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1; }
+  .amount .sym { margin-right:.05em; }
+  .reel { height:1.18em; overflow:hidden; display:inline-flex; justify-content:center;
+    transition:width .28s cubic-bezier(.22,1,.36,1), opacity .28s ease; will-change:filter; }
+  .reel-strip { display:flex; flex-direction:column; }
+  .cell { height:1.18em; display:flex; align-items:center; justify-content:center; }
+  .comma { transition:width .28s cubic-bezier(.22,1,.36,1), opacity .2s ease; overflow:hidden; text-align:center; }
+
+  /* ---- slider ---- */
+  .slider { position:relative; width:100%; max-width:408px; height:64px; touch-action:none; user-select:none; cursor:grab; }
+  .slider:active { cursor:grabbing; }
+  .slider:focus-visible { outline:none; }
+  .slider:focus-visible .track { box-shadow:0 0 0 4px rgba(127,127,127,.28); }
+  .track { position:absolute; inset:0; background:var(--track); border-radius:32px; transition:background .35s ease; }
+  .fill { position:absolute; left:0; top:0; height:64px; border-radius:32px; overflow:hidden; }
+  .dot { position:absolute; top:50%; width:7px; height:7px; border-radius:50%; transform:translate(-50%,-50%); }
+  .dot.g { background:var(--dotg); transition:background .35s ease; }
+  .dot.w { background:rgba(255,255,255,.9); }
+  .thumb { position:absolute; top:4px; width:56px; height:56px; border-radius:50%; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,.28); will-change:transform,left; }
+  .hint { font-size:clamp(11px,3vw,12px); color:var(--hint); transition:color .35s ease; text-align:center; }
+
+  /* ---- controls (outside the card) ---- */
+  .controls { display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center; }
+  .swatches { display:flex; gap:12px; }
+  .sw { width:28px; height:28px; border-radius:50%; background:var(--c); border:1px solid rgba(0,0,0,.14); cursor:pointer; padding:0; transition:transform .15s ease, box-shadow .15s ease; }
+  .sw:hover { transform:scale(1.1); }
+  .sw.active { box-shadow:0 0 0 2px #f4f4f5, 0 0 0 4px #0a0a0a; }
+  .divider { width:1px; height:20px; background:rgba(0,0,0,.14); }
+  .sound { background:none; border:0; cursor:pointer; font-size:12px; letter-spacing:.04em; color:#c4c4c4; padding:6px; transition:color .2s ease; }
+  .sound.on { color:#7a7a7a; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" data-theme="light">
+      <div class="label">Amount</div>
+      <div class="amount" id="amount"><span class="sym">$</span></div>
+      <div class="slider" id="slider" tabindex="0" role="slider"
+           aria-valuemin="0" aria-valuemax="1500" aria-valuenow="0" aria-label="Amount">
+        <div class="track"></div>
+        <div class="dots-g" id="dotsG"></div>
+        <div class="fill" id="fill"><div id="dotsW"></div></div>
+        <div class="thumb" id="thumb"></div>
+      </div>
+      <div class="hint">drag to set · $0 – $1,500</div>
+    </div>
+
+    <div class="controls">
+      <div class="swatches" id="swatches">
+        <button class="sw active" data-set="light"  style="--c:#ffffff" aria-label="Light theme"></button>
+        <button class="sw"        data-set="dark"   style="--c:#16181d" aria-label="Dark theme"></button>
+        <button class="sw"        data-set="sand"   style="--c:#f0e6d6" aria-label="Sand theme"></button>
+        <button class="sw"        data-set="indigo" style="--c:#1b1d3a" aria-label="Indigo theme"></button>
+      </div>
+      <span class="divider"></span>
+      <button class="sound on" id="sound" aria-label="Toggle sound">♪ tick</button>
+    </div>
+  </div>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <filter id="mb0" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur id="b0" stdDeviation="0 0"/></filter>
+  <filter id="mb1" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur id="b1" stdDeviation="0 0"/></filter>
+  <filter id="mb2" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur id="b2" stdDeviation="0 0"/></filter>
+  <filter id="mb3" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur id="b3" stdDeviation="0 0"/></filter>
+</defs></svg>
+
+<script>
+  const MAX = 1500, PAD = 4;
+  const PLACES = [1000, 100, 10, 1];
+  const clamp = (n,a,b) => Math.min(Math.max(n,a),b);
+
+  // geometry is MEASURED (responsive) and recomputed on resize
+  let W = 408, H = 64, R = 28, xMin = 32, xMax = 376, CELL = 88, CHW = 44, COMW = 18;
+  const valToX = v => xMin + (v/MAX) * (xMax - xMin);
+
+  // ---- rolling number ----
+  const amountEl = document.getElementById('amount');
+  const reels = PLACES.map((p, i) => {
+    const reel = document.createElement('span');
+    reel.className = 'reel'; reel.style.filter = `url(#mb${i})`;
+    const strip = document.createElement('span'); strip.className = 'reel-strip';
+    for (let d = 0; d <= 10; d++) { const c = document.createElement('span'); c.className='cell'; c.textContent=d%10; strip.appendChild(c); }
+    reel.appendChild(strip);
+    if (p === 100) { const comma = document.createElement('span'); comma.className='comma'; comma.textContent=','; comma.dataset.comma='1'; amountEl.appendChild(comma); }
+    amountEl.appendChild(reel);
+    return { p, reel, strip, blur: document.getElementById('b'+i), pos:0, prev:0 };
+  });
+  const commaEl = amountEl.querySelector('[data-comma]');
+
+  const fillEl = document.getElementById('fill'), thumbEl = document.getElementById('thumb'), slider = document.getElementById('slider');
+
+  // dots at $250 marks — kept as {el,v} so they reposition on resize
+  const dotEls = [];
+  const dotsG = document.getElementById('dotsG'), dotsW = document.getElementById('dotsW');
+  [250,500,750,1000,1250].forEach(v => {
+    const g = document.createElement('span'); g.className='dot g'; dotsG.appendChild(g); dotEls.push({el:g, v});
+    const w = document.createElement('span'); w.className='dot w'; dotsW.appendChild(w); dotEls.push({el:w, v});
+  });
+
+  // ---- responsive layout: measure rendered size, recompute geometry ----
+  function layout() {
+    const r = slider.getBoundingClientRect();
+    W = r.width; H = r.height; R = (H - 2*PAD)/2; xMin = PAD + R; xMax = W - PAD - R;
+    const cell = reels[0].strip.children[0].getBoundingClientRect();
+    CELL = cell.height; CHW = cell.width;
+    COMW = commaEl.getBoundingClientRect().width || 0;
+    dotEls.forEach(d => d.el.style.left = valToX(d.v) + 'px');
+    x = valToX(target); prevX = x;
+  }
+  window.addEventListener('resize', layout);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+
+  // ---- audio ratchet tick ----
+  let actx, soundOn = true;
+  const ensure = () => { if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); };
+  function tick() {
+    if (!soundOn) return; ensure();
+    const t = actx.currentTime;
+    const o = actx.createOscillator(), g = actx.createGain(), hp = actx.createBiquadFilter();
+    hp.type='highpass'; hp.frequency.value=1400; o.type='square'; o.frequency.value=900;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.05,t+0.004); g.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
+    o.connect(hp); hp.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+0.06);
+  }
+  const soundBtn = document.getElementById('sound');
+  soundBtn.addEventListener('click', () => { soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if(soundOn){ ensure(); tick(); } });
+
+  // ---- theme switcher (magical circular reveal + accessible number color) ----
+  const card = document.querySelector('.card');
+  const THEME_NUM = { light:{s:80,l:42}, dark:{s:82,l:64}, sand:{s:78,l:38}, indigo:{s:85,l:68} };
+  let curNumS = 80, curNumL = 42;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function paintNumber() {
+    const t = clamp((x - xMin)/(xMax - xMin), 0, 1);
+    const hue = 168 * (1 - t);
+    amountEl.style.color = `hsl(${hue.toFixed(0)} ${curNumS}% ${curNumL}%)`;
+  }
+  function commitTheme(name) {
+    card.dataset.theme = name;
+    const n = THEME_NUM[name]; curNumS = n.s; curNumL = n.l;
+    document.querySelectorAll('.sw').forEach(s => s.classList.toggle('active', s.dataset.set === name));
+    paintNumber();
+  }
+  function switchTheme(name, sw) {
+    if (name === card.dataset.theme) return;
+    if (reduceMotion || !document.startViewTransition) { commitTheme(name); return; }
+    const cr = card.getBoundingClientRect(), sr = sw.getBoundingClientRect();
+    const cx = sr.left + sr.width/2 - cr.left, cy = sr.top + sr.height/2 - cr.top;
+    const rad = Math.max(...[[0,0],[cr.width,0],[0,cr.height],[cr.width,cr.height]]
+      .map(c => Math.hypot(c[0]-cx, c[1]-cy))) + 80;
+    const root = document.documentElement.style;
+    root.setProperty('--cx', cx+'px'); root.setProperty('--cy', cy+'px'); root.setProperty('--cr', rad+'px');
+    document.startViewTransition(() => commitTheme(name));
+  }
+  document.getElementById('swatches').addEventListener('click', e => {
+    const b = e.target.closest('.sw'); if (!b) return;
+    switchTheme(b.dataset.set, b);
+  });
+
+  // ---- state (continuous, $100 ratchet feel) ----
+  let target = 0, lastBucket = 0, dragging = false;
+  function setTarget(v, fromDrag) {
+    v = clamp(Math.round(v), 0, MAX);
+    if (v === target) return;
+    const b = Math.floor(v / 100);
+    if (fromDrag && b !== lastBucket) { tick(); if (navigator.vibrate) navigator.vibrate(5); }
+    lastBucket = b; target = v;
+    slider.setAttribute('aria-valuenow', String(target));
+  }
+  const rawVal = clientX => {
+    const r = slider.getBoundingClientRect();
+    const px = clamp((clientX - r.left), xMin, xMax);
+    return (px - xMin) / (xMax - xMin) * MAX;
+  };
+  slider.addEventListener('pointerdown', e => { dragging=true; slider.setPointerCapture(e.pointerId); lastBucket=Math.floor(target/100); setTarget(rawVal(e.clientX), true); e.preventDefault(); });
+  slider.addEventListener('pointermove', e => { if (dragging) setTarget(rawVal(e.clientX), true); });
+  const end = e => { if (dragging){ dragging=false; try{slider.releasePointerCapture(e.pointerId);}catch(_){} } };
+  slider.addEventListener('pointerup', end);
+  slider.addEventListener('pointercancel', end);
+  slider.addEventListener('keydown', e => {
+    const step = e.shiftKey ? 100 : 25;
+    if (e.key==='ArrowRight'||e.key==='ArrowUp')   { setTarget(target+step, true); e.preventDefault(); }
+    if (e.key==='ArrowLeft' ||e.key==='ArrowDown') { setTarget(target-step, true); e.preventDefault(); }
+    if (e.key==='Home') setTarget(0, true);
+    if (e.key==='End')  setTarget(MAX, true);
+  });
+
+  // ---- render loop ----
+  let x = valToX(0), last = 0, prevX = x;
+  function frame(now) {
+    let dt = last ? (now-last)/1000 : 1/60; last = now; dt = Math.min(dt, 1/30);
+    const k = 1 - Math.exp(-26*dt);
+
+    const xT = valToX(target);
+    prevX = x; x += (xT - x) * k;
+    const vx = (x - prevX) / Math.max(dt, .001);
+    const sx = clamp(1 + Math.abs(vx)*0.00016, 1, 1.14);
+    const sy = 1 - (sx - 1)*0.9;
+    fillEl.style.width = (x + R) + 'px';
+    thumbEl.style.left = (x - R) + 'px';
+    thumbEl.style.transform = `scale(${sx.toFixed(3)},${sy.toFixed(3)})`;
+
+    const t = clamp((x - xMin)/(xMax - xMin), 0, 1);
+    const hue = 168 * (1 - t);
+    fillEl.style.background = `linear-gradient(90deg, hsl(${(hue+10).toFixed(0)} 88% 58%), hsl(${(hue-8).toFixed(0)} 92% 47%))`;
+    amountEl.style.color = `hsl(${hue.toFixed(0)} ${curNumS}% ${curNumL}%)`;
+
+    const rk = 1 - Math.exp(-16*dt);
+    reels.forEach(rl => {
+      const goal = Math.floor(target / rl.p);
+      rl.prev = rl.pos; rl.pos += (goal - rl.pos) * rk;
+      const mod = ((rl.pos % 10) + 10) % 10;
+      rl.strip.style.transform = `translateY(${(-mod*CELL).toFixed(2)}px)`;
+      const active = target >= rl.p || rl.p === 1;
+      rl.reel.style.width = active ? CHW+'px' : '0px';
+      rl.reel.style.opacity = active ? 1 : 0;
+      const blur = clamp(Math.abs(rl.pos - rl.prev) * CELL * 0.5, 0, 18);
+      rl.blur.setAttribute('stdDeviation', '0 ' + blur.toFixed(2));
+    });
+    if (commaEl) { const on = target >= 1000; commaEl.style.width = on ? COMW+'px':'0px'; commaEl.style.opacity = on?1:0; }
+
+    requestAnimationFrame(frame);
+  }
+  layout();
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>

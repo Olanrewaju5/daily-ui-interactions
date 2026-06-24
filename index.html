@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0c0e13" />
+<title>Daily UI Interactions</title>
+<meta name="description" content="A daily practice of unique UI interactions and micro-interactions, built with AI." />
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;min-height:100%;}
+  body{
+    background:radial-gradient(1100px 700px at 50% -10%, #1a2030 0%, #0c0e13 60%);
+    color:#e8eaf0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    -webkit-font-smoothing:antialiased; padding:clamp(28px,7vw,80px) clamp(20px,6vw,48px);
+  }
+  .inner{max-width:920px; margin:0 auto;}
+  header{margin-bottom:clamp(32px,6vw,56px);}
+  .eyebrow{text-transform:uppercase; letter-spacing:.28em; font-size:12px; color:#7f8696;}
+  h1{font-size:clamp(30px,7vw,52px); font-weight:800; letter-spacing:-.02em; margin:.35em 0 .3em; line-height:1.05;}
+  .lede{color:#9aa0ad; font-size:clamp(15px,2.5vw,18px); line-height:1.6; max-width:46ch; margin:0;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:clamp(16px,3vw,22px); margin-top:clamp(28px,6vw,44px);}
+  .card{
+    position:relative; display:block; text-decoration:none; color:inherit;
+    background:#14171f; border:1px solid #232734; border-radius:20px; padding:24px 24px 22px;
+    transition:transform .25s cubic-bezier(.22,1,.36,1), border-color .25s ease, background .25s ease;
+    overflow:hidden;
+  }
+  .card:hover{transform:translateY(-4px); border-color:#3a4050; background:#171b25;}
+  .card .day{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#6cd3a8;}
+  .card h2{font-size:20px; font-weight:700; margin:14px 0 6px;}
+  .card p{font-size:14px; color:#9aa0ad; line-height:1.55; margin:0 0 18px;}
+  .card .tags{display:flex; flex-wrap:wrap; gap:6px;}
+  .tag{font-size:11px; color:#aeb4c2; background:#1f2430; border:1px solid #2a3040; border-radius:999px; padding:4px 10px;}
+  .card .go{position:absolute; right:22px; bottom:20px; color:#7f8696; transition:transform .25s ease, color .25s ease; font-size:18px;}
+  .card:hover .go{transform:translateX(4px); color:#e8eaf0;}
+  footer{margin-top:clamp(40px,8vw,72px); color:#5b606c; font-size:13px; line-height:1.7;}
+  footer a{color:#9aa0ad;}
+</style>
+</head>
+<body>
+  <div class="inner">
+    <header>
+      <div class="eyebrow">Design · Build with AI</div>
+      <h1>Daily UI Interactions</h1>
+      <p class="lede">A daily practice of unique interactions, micro-interactions, and animation — built with the latest Claude models. One small, finishable thing at a time.</p>
+    </header>
+
+    <main class="grid">
+      <a class="card" href="./daily-builds/2026-06-24-adaptive-slider/">
+        <div class="day">Day 01</div>
+        <h2>Adaptive Slider</h2>
+        <p>A $0–$1,500 amount picker with an odometer number that motion-blurs as it rolls, value-driven color, haptic-style ticks, and a magical theme reveal.</p>
+        <div class="tags"><span class="tag">SVG filters</span><span class="tag">Web Audio</span><span class="tag">View Transitions</span></div>
+        <span class="go" aria-hidden="true">→</span>
+      </a>
+
+      <a class="card" href="./daily-builds/2026-06-24-liquid-toggle/">
+        <div class="day">Warm-up</div>
+        <h2>Liquid Toggle</h2>
+        <p>A gooey switch you can drag and fling, with throw physics and a fully synthesized water-drop pop. Two springs plus an SVG goo filter make the thumb melt and merge.</p>
+        <div class="tags"><span class="tag">Goo filter</span><span class="tag">Spring physics</span><span class="tag">Web Audio</span></div>
+        <span class="go" aria-hidden="true">→</span>
+      </a>
+    </main>
+
+    <footer>
+      Built with Claude Code · <a href="https://github.com/Olanrewaju5/daily-ui-interactions">source on GitHub</a>
+    </footer>
+  </div>
+</body>
+</html>

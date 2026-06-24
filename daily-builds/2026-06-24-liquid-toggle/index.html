@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Liquid Toggle — Daily Build 001</title>
+<style>
+  :root {
+    --bg: #0c0e13;
+    --ink: #e8eaf0;
+    --muted: #7f8696;
+    --on-a: #2ee6a6;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(900px 600px at 50% -10%, #1a2030 0%, var(--bg) 60%);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
+    display: grid;
+    place-items: center;
+    -webkit-font-smoothing: antialiased;
+  }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 34px; position: relative; }
+  .eyebrow { text-transform: uppercase; letter-spacing: .28em; font-size: 11px; color: var(--muted); }
+  .toggle {
+    background: none; border: 0; padding: 0; cursor: grab;
+    border-radius: 60px; outline: none; -webkit-tap-highlight-color: transparent;
+    touch-action: none; user-select: none;
+    filter: drop-shadow(0 18px 40px rgba(0,0,0,.55));
+  }
+  .toggle:active { cursor: grabbing; }
+  .toggle:focus-visible { box-shadow: 0 0 0 4px rgba(46,230,166,.35); }
+  .toggle svg { display: block; }
+  .state { font-size: 13px; letter-spacing: .12em; color: var(--muted); transition: color .3s ease; }
+  .state.on { color: var(--on-a); }
+  .hint { font-size: 12px; color: #565d6c; }
+  .sound {
+    position: absolute; top: -6px; right: -6px;
+    background: none; border: 0; color: #565d6c; cursor: pointer;
+    font-size: 12px; letter-spacing: .04em; padding: 6px; transition: color .2s ease;
+  }
+  .sound:hover { color: var(--muted); }
+  .sound.on { color: var(--on-a); }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+    <div class="eyebrow">Daily Build 001 · Liquid Toggle</div>
+
+    <button class="toggle" id="toggle" role="switch" aria-checked="false" aria-label="Liquid toggle">
+      <svg width="260" height="130" viewBox="0 0 240 110" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="goo">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur"/>
+            <feColorMatrix in="blur" type="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -8" result="goo"/>
+            <feBlend in="SourceGraphic" in2="goo"/>
+          </filter>
+          <linearGradient id="gOff" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2a2f3a"/><stop offset="1" stop-color="#1d212a"/>
+          </linearGradient>
+          <linearGradient id="gOn" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#2ee6a6"/><stop offset="1" stop-color="#18b3d6"/>
+          </linearGradient>
+          <linearGradient id="gThumb" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d7dce6"/>
+          </linearGradient>
+          <radialGradient id="gGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stop-color="#2ee6a6" stop-opacity=".55"/>
+            <stop offset="1" stop-color="#2ee6a6" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <rect x="10" y="15" width="220" height="80" rx="40" fill="url(#gOff)"/>
+        <rect id="onRect" x="10" y="15" width="220" height="80" rx="40" fill="url(#gOn)" opacity="0"/>
+        <rect x="10" y="15" width="220" height="80" rx="40" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="2"/>
+
+        <ellipse id="glow" cx="190" cy="55" rx="70" ry="55" fill="url(#gGlow)" opacity="0"/>
+
+        <g filter="url(#goo)">
+          <g id="drop"><circle r="24" fill="url(#gThumb)"/></g>
+          <g id="thumb"><circle r="32" fill="url(#gThumb)"/></g>
+        </g>
+      </svg>
+    </button>
+
+    <div class="state" id="state">OFF</div>
+    <div class="hint">drag the thumb &amp; fling it · or click · space / enter</div>
+  </div>
+
+<script>
+  const OFF_CX = 50, ON_CX = 190, CY = 55, MID = (OFF_CX + ON_CX) / 2;
+  const clamp = (n, a, b) => Math.min(Math.max(n, a), b);
+
+  function spring(stiffness, damping, value) {
+    return {
+      value, vel: 0, target: value, stiffness, damping,
+      step(dt) {
+        const f = -this.stiffness * (this.value - this.target) - this.damping * this.vel;
+        this.vel += f * dt;
+        this.value += this.vel * dt;
+      }
+    };
+  }
+  const thumb = spring(430, 33, OFF_CX);
+  const drop  = spring(250, 24, OFF_CX);
+
+  const elThumb = document.getElementById('thumb');
+  const elDrop  = document.getElementById('drop');
+  const onRect  = document.getElementById('onRect');
+  const glow    = document.getElementById('glow');
+  const stateEl = document.getElementById('state');
+  const btn     = document.getElementById('toggle');
+  const svg     = btn.querySelector('svg');
+
+  /* ---------- Web Audio: synthesized watery pop ---------- */
+  let actx, soundOn = true;
+  function ensureAudio() {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+  }
+  function pop(turningOn) {
+    if (!soundOn) return;
+    ensureAudio();
+    const t = actx.currentTime;
+
+    // body — sine with a pitch sweep (up for ON, down for OFF)
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+    const lp = actx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 2200;
+    osc.type = 'sine';
+    const f0 = turningOn ? 300 : 640;
+    const f1 = turningOn ? 880 : 170;
+    osc.frequency.setValueAtTime(f0, t);
+    osc.frequency.exponentialRampToValueAtTime(f1, t + 0.17);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.34, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    osc.connect(lp); lp.connect(gain); gain.connect(actx.destination);
+    osc.start(t); osc.stop(t + 0.3);
+
+    // watery overtone — short triangle plink a 5th above the landing pitch
+    const o2 = actx.createOscillator();
+    const g2 = actx.createGain();
+    o2.type = 'triangle';
+    o2.frequency.setValueAtTime(f1 * 1.5, t);
+    g2.gain.setValueAtTime(0.0001, t);
+    g2.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    o2.connect(g2); g2.connect(actx.destination);
+    o2.start(t); o2.stop(t + 0.16);
+
+    // click transient — band-passed noise burst for the "tap"
+    const len = Math.floor(actx.sampleRate * 0.03);
+    const buf = actx.createBuffer(1, len, actx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    const ns = actx.createBufferSource(); ns.buffer = buf;
+    const nf = actx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 1300; nf.Q.value = 0.8;
+    const ng = actx.createGain(); ng.gain.value = 0.09;
+    ns.connect(nf); nf.connect(ng); ng.connect(actx.destination);
+    ns.start(t);
+  }
+
+  const soundBtn = document.getElementById('sound');
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.classList.toggle('on', soundOn);
+    if (soundOn) { ensureAudio(); pop(true); }
+  });
+
+  /* ---------- state ---------- */
+  let on = false;
+  function setOn(next) {
+    if (next !== on) pop(next);
+    on = next;
+    const t = on ? ON_CX : OFF_CX;
+    thumb.target = t; drop.target = t;   // keeps any existing velocity (throw momentum)
+    btn.setAttribute('aria-checked', String(on));
+    stateEl.textContent = on ? 'ON' : 'OFF';
+    stateEl.classList.toggle('on', on);
+  }
+
+  /* ---------- drag / fling ---------- */
+  let dragging = false, moved = false, grabOffset = 0, lastX = 0, lastT = 0, vel = 0;
+  const toSvgX = (clientX) => {
+    const r = svg.getBoundingClientRect();
+    return (clientX - r.left) * (240 / r.width);
+  };
+
+  btn.addEventListener('pointerdown', (e) => {
+    dragging = true; moved = false;
+    btn.setPointerCapture(e.pointerId);
+    const x = toSvgX(e.clientX);
+    grabOffset = x - thumb.value;
+    lastX = x; lastT = performance.now(); vel = 0;
+    e.preventDefault();
+  });
+
+  btn.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const x = toSvgX(e.clientX);
+    const target = clamp(x - grabOffset, OFF_CX, ON_CX);
+    if (Math.abs(target - thumb.value) > 1.5) moved = true;
+    const now = performance.now();
+    const dt = (now - lastT) / 1000;
+    if (dt > 0) vel = (x - lastX) / dt;          // svg units / sec
+    lastX = x; lastT = now;
+    thumb.value = target; thumb.vel = vel;        // spring frozen while dragging
+    thumb.target = target; drop.target = target;  // droplet trails via its soft spring
+  });
+
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    try { btn.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (!moved) { setOn(!on); return; }           // it was really a click
+    const next = Math.abs(vel) > 120 ? vel > 0 : thumb.value > MID;
+    thumb.vel = clamp(vel, -1600, 1600);          // carry the throw into the spring
+    setOn(next);
+  }
+  btn.addEventListener('pointerup', endDrag);
+  btn.addEventListener('pointercancel', endDrag);
+
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setOn(!on); }
+  });
+
+  /* ---------- render loop ---------- */
+  let last = 0;
+  function frame(now) {
+    let dt = last ? (now - last) / 1000 : 1 / 60;
+    last = now;
+    dt = Math.min(dt, 1 / 30);
+    const steps = 4, h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      if (!dragging) thumb.step(h);   // dragging drives thumb directly
+      drop.step(h);
+    }
+    const cx = thumb.value, dx = drop.value, v = thumb.vel;
+    const sx = clamp(1 + Math.abs(v) * 0.0017, 1, 1.55);
+    const sy = 1 - (sx - 1) * 0.65;
+    elThumb.setAttribute('transform', `translate(${cx} ${CY}) scale(${sx} ${sy})`);
+    elDrop.setAttribute('transform', `translate(${dx} ${CY})`);
+    const prog = clamp((cx - OFF_CX) / (ON_CX - OFF_CX), 0, 1);
+    onRect.style.opacity = prog;
+    glow.style.opacity = prog;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>
