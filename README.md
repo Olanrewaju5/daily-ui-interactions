@@ -8,12 +8,13 @@ A daily practice of unique UI interactions, micro-interactions, and animation �
 
 | Day | Build | Highlights | Tech |
 |-----|-------|-----------|------|
+| 02 | [Drag-to-Reorder List](./daily-builds/2026-06-24-reorder-list/) | "Up Next" playlist where dragging a track springs the others out of the way — drag handle, lift-on-grab, soft blip per swap | React, Framer Motion (Reorder) |
 | 01 | [Adaptive Slider](./daily-builds/2026-06-24-adaptive-slider/) | $0–$1,500 amount picker — odometer number with per-digit motion blur, value-driven color, $100 ratchet ticks, theme switcher with a circular reveal | SVG filters, Web Audio, View Transitions API |
 | — | [Liquid Toggle](./daily-builds/2026-06-24-liquid-toggle/) (warm-up) | Drag-and-fling gooey switch with throw physics and a synthesized water-drop pop | SVG goo filter, spring physics, Web Audio |
 
 ## Stack
 
-No framework, no bundler. Plain HTML/CSS/JS with hand-rolled spring physics and `requestAnimationFrame` loops — kept deliberately dependency-free so each interaction can be read end-to-end in one file.
+Mostly framework-free — plain HTML/CSS/JS with hand-rolled spring physics and `requestAnimationFrame` loops, kept dependency-free so each interaction reads end-to-end in one file. Builds that explore a specific library (e.g. Day 2 uses React + Framer Motion) load it from a CDN via an import map, so there's still no build step.
 
 ## Local preview
 

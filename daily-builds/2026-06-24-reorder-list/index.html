@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0c0e13" />
+<title>Drag-to-Reorder — Day 2</title>
+
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "react/jsx-dev-runtime": "https://esm.sh/react@18.3.1/jsx-dev-runtime",
+    "react-dom": "https://esm.sh/react-dom@18.3.1?external=react",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?external=react",
+    "framer-motion": "https://esm.sh/framer-motion@11.11.17?external=react,react-dom"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:radial-gradient(900px 600px at 50% -10%, #1a2030 0%, #0c0e13 60%);
+    color:#e8eaf0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased;
+  }
+  .app {
+    width:100%; max-width:460px; background:#14171f; border-radius:26px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.8);
+    padding:26px 22px 22px;
+  }
+  .head { display:flex; align-items:center; justify-content:space-between; padding:0 8px 18px; }
+  .head h1 { font-size:19px; font-weight:700; margin:0; letter-spacing:-.01em; }
+  .head .sub { font-size:12px; color:#7f8696; margin-top:3px; }
+  .sound { background:none; border:0; cursor:pointer; color:#5b606c; font-size:12px; padding:6px; transition:color .2s ease; }
+  .sound.on { color:#6cd3a8; }
+
+  .list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+  .row {
+    display:flex; align-items:center; gap:14px; padding:10px 12px;
+    background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.05);
+    border-radius:16px; position:relative; user-select:none;
+  }
+  .row:hover { background:rgba(255,255,255,.06); }
+  .handle {
+    display:flex; flex-direction:column; gap:3px; padding:6px 4px; cursor:grab;
+    touch-action:none; color:#5b606c; transition:color .2s ease;
+  }
+  .handle:active { cursor:grabbing; }
+  .row:hover .handle { color:#9aa0ad; }
+  .handle span { display:block; width:16px; height:2px; border-radius:2px; background:currentColor; }
+  .cover { width:46px; height:46px; border-radius:12px; flex:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); }
+  .meta { flex:1; min-width:0; }
+  .title { font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .artist { font-size:13px; color:#8b909c; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dur { font-size:13px; color:#6f7480; font-variant-numeric:tabular-nums; flex:none; }
+  .hint { text-align:center; font-size:12px; color:#565c68; padding:16px 0 4px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useState } from "react";
+import { createRoot } from "react-dom/client";
+import { Reorder, useDragControls } from "framer-motion";
+
+const TRACKS = [
+  { id:"a", title:"Midnight Drive", artist:"Neon Wave",    dur:"3:24", hue:265 },
+  { id:"b", title:"Golden Hour",    artist:"Sol Maris",    dur:"4:02", hue:35  },
+  { id:"c", title:"Paper Planes",   artist:"The Lantern",  dur:"2:51", hue:155 },
+  { id:"d", title:"Velvet Static",  artist:"Cassette Club",dur:"3:47", hue:330 },
+  { id:"e", title:"Slow Motion",    artist:"Adriel",       dur:"3:09", hue:200 },
+  { id:"f", title:"Afterglow",      artist:"Nova Rey",     dur:"4:18", hue:12  },
+];
+
+let actx;
+function blip() {
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    const t = actx.currentTime;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(440, t);
+    o.frequency.exponentialRampToValueAtTime(620, t + 0.05);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.11, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t); o.stop(t + 0.15);
+  } catch (e) {}
+}
+
+function Track({ item }) {
+  const controls = useDragControls();
+  return (
+    <Reorder.Item
+      value={item}
+      id={item.id}
+      dragListener={false}
+      dragControls={controls}
+      className="row"
+      whileDrag={{ scale: 1.035, backgroundColor: "rgba(255,255,255,0.08)",
+                   boxShadow: "0 22px 46px rgba(0,0,0,0.55)" }}
+      transition={{ type: "spring", stiffness: 620, damping: 40 }}
+    >
+      <div className="handle" onPointerDown={(e) => controls.start(e)} aria-label="Drag to reorder">
+        <span></span><span></span><span></span>
+      </div>
+      <div className="cover" style={{
+        background:`linear-gradient(135deg, hsl(${item.hue} 82% 62%), hsl(${item.hue + 40} 76% 48%))`
+      }}></div>
+      <div className="meta">
+        <div className="title">{item.title}</div>
+        <div className="artist">{item.artist}</div>
+      </div>
+      <div className="dur">{item.dur}</div>
+    </Reorder.Item>
+  );
+}
+
+function App() {
+  const [items, setItems] = useState(TRACKS);
+  const [sound, setSound] = useState(true);
+
+  const onReorder = (next) => {
+    if (sound) blip();
+    if (navigator.vibrate) navigator.vibrate(6);
+    setItems(next);
+  };
+
+  return (
+    <div className="app">
+      <div className="head">
+        <div>
+          <h1>Up Next</h1>
+          <div className="sub">{items.length} tracks</div>
+        </div>
+        <button className={"sound" + (sound ? " on" : "")}
+          onClick={() => { setSound(s => !s); if (!sound) blip(); }}>♪ sound</button>
+      </div>
+
+      <Reorder.Group as="ul" axis="y" values={items} onReorder={onReorder} className="list">
+        {items.map((it) => <Track key={it.id} item={it} />)}
+      </Reorder.Group>
+
+      <div className="hint">drag the ⋮ handle to reorder</div>
+    </div>
+  );
+}
+
+createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
