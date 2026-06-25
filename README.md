@@ -8,6 +8,7 @@ A daily practice of unique UI interactions, micro-interactions, and animation �
 
 | Day | Build | Highlights | Tech |
 |-----|-------|-----------|------|
+| 03 | [Expanding Cards](./daily-builds/2026-06-24-expanding-cards/) | Destinations grid that morph-expands into a detail view and back — shared-element transition with no FLIP math | React, Framer Motion (layoutId + AnimatePresence) |
 | 02 | [Drag-to-Reorder List](./daily-builds/2026-06-24-reorder-list/) | "Up Next" playlist where dragging a track springs the others out of the way — drag handle, lift-on-grab, soft blip per swap | React, Framer Motion (Reorder) |
 | 01 | [Adaptive Slider](./daily-builds/2026-06-24-adaptive-slider/) | $0–$1,500 amount picker — odometer number with per-digit motion blur, value-driven color, $100 ratchet ticks, theme switcher with a circular reveal | SVG filters, Web Audio, View Transitions API |
 | — | [Liquid Toggle](./daily-builds/2026-06-24-liquid-toggle/) (warm-up) | Drag-and-fling gooey switch with throw physics and a synthesized water-drop pop | SVG goo filter, spring physics, Web Audio |

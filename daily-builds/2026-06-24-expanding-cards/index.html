@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#f4f4f5" />
+<title>Expanding Cards — Day 3</title>
+
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "react/jsx-dev-runtime": "https://esm.sh/react@18.3.1/jsx-dev-runtime",
+    "react-dom": "https://esm.sh/react-dom@18.3.1?external=react",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?external=react",
+    "framer-motion": "https://esm.sh/framer-motion@11.11.17?external=react,react-dom"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; min-height:100%; }
+  body {
+    background:#f4f4f5; color:#16181d;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    -webkit-font-smoothing:antialiased; padding:clamp(28px,6vw,64px) clamp(18px,5vw,40px);
+  }
+  .wrap { max-width:860px; margin:0 auto; }
+  .eyebrow { text-transform:uppercase; letter-spacing:.26em; font-size:12px; color:#9298a3; }
+  h1 { font-size:clamp(28px,6vw,44px); font-weight:800; letter-spacing:-.02em; margin:.3em 0 .15em; }
+  .lede { color:#7c818b; font-size:15px; margin:0 0 clamp(24px,5vw,40px); }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:clamp(14px,2.5vw,20px); }
+  .card {
+    cursor:pointer; border-radius:20px; background:#fff; overflow:hidden;
+    box-shadow:0 0 0 1px rgba(18,20,40,.05), 0 12px 24px -18px rgba(18,20,40,.3);
+  }
+  .cover { aspect-ratio:4/3; width:100%; }
+  .card-body { padding:14px 16px 16px; }
+  .cat { font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:#a3a8b2; }
+  .title { font-size:17px; font-weight:700; margin:5px 0 0; letter-spacing:-.01em; }
+
+  /* expanded */
+  .backdrop { position:fixed; inset:0; background:rgba(12,14,22,.55); backdrop-filter:blur(4px); z-index:30; }
+  .overlay { position:fixed; inset:0; z-index:31; display:flex; align-items:center; justify-content:center; padding:20px; pointer-events:none; }
+  .expanded {
+    pointer-events:auto; width:min(540px,94vw); max-height:88vh; overflow-y:auto;
+    background:#fff; border-radius:24px; box-shadow:0 40px 90px -30px rgba(0,0,0,.5); position:relative;
+  }
+  .expanded .cover { aspect-ratio:16/10; border-radius:0; }
+  .expanded .ex-body { padding:24px 26px 30px; }
+  .expanded .cat { font-size:12px; }
+  .expanded .title { font-size:30px; margin-top:8px; }
+  .ex-text { margin-top:16px; color:#4a4f59; font-size:15px; line-height:1.65; }
+  .ex-text p { margin:0 0 12px; }
+  .meta-row { display:flex; gap:18px; margin-top:18px; padding-top:16px; border-top:1px solid rgba(18,20,40,.08); }
+  .meta { font-size:13px; }
+  .meta b { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:#a3a8b2; font-weight:600; margin-bottom:3px; }
+  .close {
+    position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%;
+    border:0; cursor:pointer; background:rgba(255,255,255,.85); backdrop-filter:blur(6px);
+    font-size:18px; line-height:1; color:#16181d; display:grid; place-items:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.2);
+  }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useState, useEffect } from "react";
+import { createRoot } from "react-dom/client";
+import { motion, AnimatePresence } from "framer-motion";
+
+const PLACES = [
+  { id:"kyoto",     title:"Kyoto",     cat:"Japan",    hue:330, best:"Apr · Nov", days:"4–5 days",
+    body:["Lantern-lit alleys, moss gardens, and a thousand vermilion gates climbing the mountain behind Fushimi Inari.","Time it for cherry blossoms in spring or the deep reds of momiji season in late autumn."] },
+  { id:"santorini", title:"Santorini", cat:"Greece",   hue:205, best:"May · Sep", days:"3–4 days",
+    body:["Whitewashed villages spill down the caldera, blue domes catching the last of the Aegean light.","Watch the sun drop into the sea from Oia, then lose the crowds on the black-sand beaches below."] },
+  { id:"marrakech", title:"Marrakech", cat:"Morocco",  hue:25,  best:"Mar · May", days:"3 days",
+    body:["A maze of souks, the call to prayer over the medina, and mint tea poured from impossible heights.","Escape the heat in a tiled riad courtyard, then watch the square come alive after dark."] },
+  { id:"reykjavik", title:"Reykjavík", cat:"Iceland",  hue:182, best:"Sep · Mar", days:"5–7 days",
+    body:["Black lava fields, steam rising off the earth, and the aurora unrolling green across the winter sky.","Base yourself in the city and chase waterfalls, glaciers, and hot springs on the Ring Road."] },
+  { id:"lisbon",    title:"Lisbon",    cat:"Portugal", hue:45,  best:"Mar · Oct", days:"3–4 days",
+    body:["Yellow trams grind up tiled hills, fado drifts from doorways, and the river glitters at the bottom of every street.","Eat pastéis fresh from the oven and end the day on a miradouro with a glass of vinho verde."] },
+  { id:"banff",     title:"Banff",     cat:"Canada",   hue:150, best:"Jun · Sep", days:"4–6 days",
+    body:["Glacier-fed lakes in unreal turquoise, pine forests, and granite peaks doubling in the still water.","Hike to a teahouse above Lake Louise, then soak in the hot springs as the mountains turn pink."] },
+];
+
+const cover = (hue) => ({
+  background:`radial-gradient(circle at 28% 26%, hsl(${hue} 92% 72%), transparent 58%),`+
+             `radial-gradient(circle at 74% 78%, hsl(${hue+48} 86% 56%), transparent 56%),`+
+             `linear-gradient(135deg, hsl(${hue} 72% 46%), hsl(${hue+28} 76% 40%))`
+});
+
+function App() {
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") setSelected(null); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = selected ? "hidden" : "";
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
+
+  return (
+    <div className="wrap">
+      <div className="eyebrow">Day 03 · Shared layout</div>
+      <h1>Destinations</h1>
+      <p className="lede">Tap a card — it morphs open into the full story, and back again.</p>
+
+      <div className="grid">
+        {PLACES.map((p, i) => (
+          <motion.div
+            key={p.id}
+            className="card"
+            layoutId={`card-${p.id}`}
+            onClick={() => setSelected(p)}
+            initial={{ opacity:0, y:18 }}
+            animate={{ opacity:1, y:0 }}
+            transition={{ delay: i * 0.06, type:"spring", stiffness:340, damping:30 }}
+            whileHover={{ y:-4 }}
+          >
+            <motion.div className="cover" layoutId={`cover-${p.id}`} style={cover(p.hue)} />
+            <div className="card-body">
+              <motion.div className="cat" layoutId={`cat-${p.id}`}>{p.cat}</motion.div>
+              <motion.h3 className="title" layoutId={`title-${p.id}`}>{p.title}</motion.h3>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <AnimatePresence>
+        {selected && (
+          <>
+            <motion.div
+              className="backdrop"
+              initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+              onClick={() => setSelected(null)}
+            />
+            <div className="overlay">
+              <motion.div className="expanded" layoutId={`card-${selected.id}`}>
+                <motion.div className="cover" layoutId={`cover-${selected.id}`} style={cover(selected.hue)} />
+                <button className="close" onClick={() => setSelected(null)} aria-label="Close">✕</button>
+                <div className="ex-body">
+                  <motion.div className="cat" layoutId={`cat-${selected.id}`}>{selected.cat}</motion.div>
+                  <motion.h3 className="title" layoutId={`title-${selected.id}`}>{selected.title}</motion.h3>
+                  <motion.div className="ex-text"
+                    initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
+                    transition={{ delay:0.15, duration:0.3 }}>
+                    {selected.body.map((t, j) => <p key={j}>{t}</p>)}
+                    <div className="meta-row">
+                      <div className="meta"><b>Best time</b>{selected.best}</div>
+                      <div className="meta"><b>Stay</b>{selected.days}</div>
+                    </div>
+                  </motion.div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
