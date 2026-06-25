@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#ffffff" />
+<title>Empty State — Proximity Drawer · Day 4</title>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:#ffffff; color:#1b1d24;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    display:grid; place-items:center; -webkit-font-smoothing:antialiased; padding:24px;
+  }
+  .empty { width:100%; max-width:440px; text-align:center; display:flex; flex-direction:column; align-items:center; }
+  .stage { width:min(360px,82vw); margin-bottom:14px; cursor:pointer; }
+  .stage svg { display:block; width:100%; height:auto; overflow:visible; }
+  .cab { stroke:#2b2b2b; stroke-width:3.6; stroke-linejoin:round; stroke-linecap:round; fill:none; }
+  h1 { font-size:30px; font-weight:700; letter-spacing:-.01em; margin:8px 0 0; }
+  p { color:#9a9aa0; font-size:18px; line-height:1.5; margin:14px 0 0; max-width:22em; }
+  .btn {
+    margin-top:30px; display:inline-flex; align-items:center; gap:10px;
+    background:#1c1c1e; color:#fff; border:0; cursor:pointer;
+    font-size:18px; font-weight:600; padding:15px 26px; border-radius:999px;
+    transition:transform .18s cubic-bezier(.22,1,.36,1), background .2s ease;
+  }
+  .btn:hover { transform:translateY(-2px); background:#000; }
+  .btn:active { transform:translateY(0) scale(.98); }
+  .btn .plus { font-size:22px; line-height:1; margin-top:-1px; }
+  .sound {
+    position:fixed; bottom:18px; right:20px; background:none; border:0; cursor:pointer;
+    font-size:12px; letter-spacing:.04em; color:#c8c8cc; padding:8px; transition:color .2s ease;
+  }
+  .sound.on { color:#8a8a90; }
+</style>
+</head>
+<body>
+  <div class="empty">
+    <div class="stage" id="stage"></div>
+    <h1>No data yet</h1>
+    <p>Your data will appear here once you create or import your first records</p>
+    <button class="btn"><span class="plus">+</span> Add Data</button>
+  </div>
+  <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+
+<script>
+  // ---------- isometric projection ----------
+  const S = 160, A = Math.PI/6, CO = Math.cos(A)*S, SI = Math.sin(A)*S, VS = S;
+  const OX = 300, OY = 250;
+  const P = (x,y,z) => [ OX + (x - z)*CO, OY + (x + z)*SI - y*VS ];
+  const r2 = n => Math.round(n*100)/100;
+  const pts = a => a.map(p => r2(p[0]) + ',' + r2(p[1])).join(' ');
+  const poly = (a, fill='#fff') => `<polygon points="${pts(a)}" fill="${fill}"/>`;
+  const line = (a,b) => `<line x1="${r2(a[0])}" y1="${r2(a[1])}" x2="${r2(b[0])}" y2="${r2(b[1])}"/>`;
+
+  // ---------- cabinet dimensions (iso units) ----------
+  const W = 0.95, D = 0.66, H = 1.92, LEG = 0.05;
+  const FZ = D;                          // front face plane
+  const PULL = 0.50;                     // drawer travel in z units
+
+  const topDrawer = [1.06, 1.66];
+  const botDrawer = [0.36, 0.96];
+  const tray = { x0:0.05, x1:0.90, y0:0.40, y1:0.92, zb:0.07 };
+
+  // ---------- body (static, behind the drawer) ----------
+  const body = [];
+  body.push(poly([P(0,H,0), P(W,H,0), P(W,H,D), P(0,H,D)], '#ffffff'));          // top
+  body.push(poly([P(W,LEG,0), P(W,LEG,D), P(W,H,D), P(W,H,0)], '#f6f6f7'));      // right side
+  body.push(poly([P(0,LEG,D), P(W,LEG,D), P(W,H,D), P(0,H,D)], '#ffffff'));      // front
+  // two small feet (front face only — keeps it tidy)
+  const foot = (fx) => poly([P(fx,0,D-0.02), P(fx+0.10,0,D-0.02), P(fx+0.10,LEG,D-0.02), P(fx,LEG,D-0.02)], '#eeeef0');
+  body.push(foot(0.03));
+  body.push(foot(W-0.13));
+  // bottom-drawer recess (the hole revealed when it opens) — flat, no bleeding side faces
+  body.push(poly([P(tray.x0,botDrawer[0],FZ), P(tray.x1,botDrawer[0],FZ), P(tray.x1,botDrawer[1],FZ), P(tray.x0,botDrawer[1],FZ)], '#e9e9eb'));
+
+  // reusable drawer face (panel + label + lifted handle)
+  function drawerFront(y0, y1) {
+    const s = [];
+    s.push(poly([P(tray.x0,y0,FZ), P(tray.x1,y0,FZ), P(tray.x1,y1,FZ), P(tray.x0,y1,FZ)], '#ffffff'));
+    const lx0=0.18, lx1=0.40, ly=(y0+y1)/2;
+    s.push(poly([P(lx0,ly+0.07,FZ), P(lx1,ly+0.07,FZ), P(lx1,ly+0.17,FZ), P(lx0,ly+0.17,FZ)], '#f0f0f2')); // label
+    const hx0=0.30, hx1=0.60, hy=ly-0.06, hz=FZ+0.05;                                                       // handle
+    s.push(line(P(hx0,hy,FZ), P(hx0,hy,hz)));
+    s.push(line(P(hx1,hy,FZ), P(hx1,hy,hz)));
+    s.push(poly([P(hx0,hy-0.02,hz), P(hx1,hy-0.02,hz), P(hx1,hy+0.02,hz), P(hx0,hy+0.02,hz)], '#fafafa'));
+    return s.join('');
+  }
+  body.push(drawerFront(topDrawer[0], topDrawer[1]));   // top drawer (static)
+
+  // ---------- moving drawer ----------
+  const { x0,x1,y0,y1,zb } = tray;
+  const interior = [];
+  interior.push(poly([P(x0,y0,FZ), P(x1,y0,FZ), P(x1,y0,zb), P(x0,y0,zb)], '#f2f2f4'));  // inner floor
+  interior.push(poly([P(x0,y0,FZ), P(x0,y0,zb), P(x0,y1,zb), P(x0,y1,FZ)], '#fbfbfc'));  // left inner wall
+  interior.push(poly([P(x0,y0,zb), P(x1,y0,zb), P(x1,y1,zb), P(x0,y1,zb)], '#f6f6f8'));  // back inner wall
+  interior.push(poly([P(x0,y1,FZ), P(x1,y1,FZ), P(x1,y1,zb), P(x0,y1,zb)], '#ffffff'));  // top rim (mouth)
+  interior.push(poly([P(x1,y0,FZ), P(x1,y0,zb), P(x1,y1,zb), P(x1,y1,FZ)], '#f3f3f5'));  // outer near side
+  interior.push(line(P(x1,y0+0.03,FZ), P(x1,y0+0.03,zb)));                               // rail
+  interior.push(line(P(x0,y0+0.03,FZ), P(x0,y0+0.03,zb)));                               // rail
+  const frontPanel = drawerFront(botDrawer[0], botDrawer[1]);
+
+  const shadow = `<ellipse cx="${OX-6}" cy="${OY + (W+D)*SI + 18}" rx="150" ry="26" fill="#000" opacity="0.06"/>`;
+  const svg = `
+    <svg viewBox="0 -130 600 780" xmlns="http://www.w3.org/2000/svg" aria-label="Filing cabinet, empty">
+      ${shadow}
+      <g class="cab">${body.join('')}</g>
+      <g class="cab" id="trayInterior" style="opacity:0">${interior.join('')}</g>
+      <g class="cab" id="frontPanel">${frontPanel}</g>
+    </svg>`;
+  const stage = document.getElementById('stage');
+  stage.innerHTML = svg;
+  const svgEl = stage.querySelector('svg');
+  const gInterior = document.getElementById('trayInterior');
+  const gFront = document.getElementById('frontPanel');
+  const dX = -CO, dY = SI;   // screen delta per +z unit
+
+  // ---------- audio ----------
+  let actx, soundOn = true, noiseGain, noiseFilter, noiseStarted = false;
+  function ensure() {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    if (!noiseStarted) startNoise();
+  }
+  function startNoise() {
+    const len = actx.sampleRate * 1.2, buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i=0;i<len;i++) d[i] = Math.random()*2-1;
+    const src = actx.createBufferSource(); src.buffer = buf; src.loop = true;
+    noiseFilter = actx.createBiquadFilter(); noiseFilter.type='bandpass'; noiseFilter.frequency.value=300; noiseFilter.Q.value=0.8;
+    noiseGain = actx.createGain(); noiseGain.gain.value = 0;
+    src.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(actx.destination);
+    src.start(); noiseStarted = true;
+  }
+  function clunk(intensity) {
+    if (!soundOn) return; ensure();
+    const t = actx.currentTime;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type='triangle'; o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(72,t+0.12);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.3*intensity,t+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t+0.2);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+0.22);
+    const nl = Math.floor(actx.sampleRate*0.04), nb = actx.createBuffer(1,nl,actx.sampleRate), nd = nb.getChannelData(0);
+    for (let i=0;i<nl;i++) nd[i] = (Math.random()*2-1)*Math.pow(1-i/nl,2);
+    const ns = actx.createBufferSource(); ns.buffer = nb;
+    const nf = actx.createBiquadFilter(); nf.type='lowpass'; nf.frequency.value=900;
+    const ng = actx.createGain(); ng.gain.value = 0.18*intensity;
+    ns.connect(nf); nf.connect(ng); ng.connect(actx.destination); ns.start(t);
+  }
+  const soundBtn = document.getElementById('sound');
+  soundBtn.addEventListener('click', () => { soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if (soundOn){ ensure(); clunk(0.5); } });
+
+  // ---------- proximity → open amount ----------
+  let openTarget = 0, openCur = 0, vel = 0;
+  const R = 230;
+  let touchOpen = false;
+  function setTargetFromPointer(cx, cy) {
+    const r = svgEl.getBoundingClientRect();
+    const nx = Math.max(r.left, Math.min(cx, r.right));
+    const ny = Math.max(r.top,  Math.min(cy, r.bottom));
+    const dist = Math.hypot(cx - nx, cy - ny);
+    openTarget = Math.max(0, Math.min(1, 1 - dist / R));
+  }
+  window.addEventListener('pointermove', (e) => { if (e.pointerType === 'touch') return; ensure(); setTargetFromPointer(e.clientX, e.clientY); });
+  window.addEventListener('pointerleave', () => { openTarget = 0; });
+  stage.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') return; ensure(); touchOpen = !touchOpen; openTarget = touchOpen ? 1 : 0; });
+
+  // debug hook for headless verification
+  window.__setOpen = (v) => { openTarget = v; openCur = v; vel = 0; };
+
+  // ---------- render loop ----------
+  let last = 0, wasOpen = false, wasClosed = true;
+  function frame(now) {
+    let dt = last ? (now-last)/1000 : 1/60; last = now; dt = Math.min(dt, 1/30);
+    const f = -240*(openCur - openTarget) - 22*vel;
+    vel += f*dt; openCur += vel*dt;
+    const shown = Math.max(0, Math.min(1.04, openCur));
+
+    const tx = dX * PULL * shown, ty = dY * PULL * shown;
+    const tf = `translate(${r2(tx)} ${r2(ty)})`;
+    gInterior.setAttribute('transform', tf);
+    gFront.setAttribute('transform', tf);
+    gInterior.style.opacity = Math.max(0, Math.min(1, (shown - 0.03) * 5));   // fade interior in
+
+    if (noiseGain) {
+      const speed = Math.abs(vel);
+      noiseGain.gain.setTargetAtTime(soundOn ? Math.min(0.10, speed * 0.05) : 0, actx.currentTime, 0.03);
+      noiseFilter.frequency.setTargetAtTime(260 + speed*120, actx.currentTime, 0.05);
+    }
+    if (!wasOpen && openCur > 0.96 && vel > 0.02) { clunk(Math.min(1, 0.5 + Math.abs(vel))); wasOpen = true; }
+    if (openCur < 0.9) wasOpen = false;
+    if (!wasClosed && openCur < 0.04 && vel < -0.02) { clunk(0.45); wasClosed = true; }
+    if (openCur > 0.1) wasClosed = false;
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>
