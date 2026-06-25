@@ -23,49 +23,72 @@
 <style>
   * { box-sizing:border-box; }
   html, body { height:100%; margin:0; }
+
+  body[data-theme="dark"] {
+    --page: radial-gradient(900px 600px at 50% -10%, #1a2030 0%, #0c0e13 60%);
+    --card:#14171f; --row:#1b1e27; --row-hover:#21252f; --row-drag:#262b38; --row-border:rgba(255,255,255,.05);
+    --text:#e8eaf0; --sub:#7f8696; --artist:#8b909c; --dur:#6f7480; --handle:#5b606c; --handle-hover:#9aa0ad;
+    --ring:0 0 0 1px rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.8);
+    --drag-shadow:0 22px 46px rgba(0,0,0,.6);
+  }
+  body[data-theme="light"] {
+    --page: radial-gradient(900px 600px at 50% -10%, #ffffff 0%, #eceef3 65%);
+    --card:#ffffff; --row:#f4f5f8; --row-hover:#eef0f4; --row-drag:#ffffff; --row-border:rgba(18,20,40,.06);
+    --text:#1a1d24; --sub:#9398a3; --artist:#9298a3; --dur:#aab0ba; --handle:#c2c6cf; --handle-hover:#7c818b;
+    --ring:0 0 0 1px rgba(18,20,40,.06), 0 24px 48px -28px rgba(18,20,40,.20);
+    --drag-shadow:0 20px 42px rgba(18,20,40,.22);
+  }
+
   body {
-    background:radial-gradient(900px 600px at 50% -10%, #1a2030 0%, #0c0e13 60%);
-    color:#e8eaf0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    background:var(--page); color:var(--text);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
     display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased;
+    transition:background .4s ease, color .4s ease;
   }
   .app {
-    width:100%; max-width:460px; background:#14171f; border-radius:26px;
-    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.8);
-    padding:26px 22px 22px;
+    width:100%; max-width:460px; background:var(--card); border-radius:26px;
+    box-shadow:var(--ring); padding:26px 22px 22px;
+    transition:background .4s ease, box-shadow .4s ease;
   }
-  .head { display:flex; align-items:center; justify-content:space-between; padding:0 8px 18px; }
+  .head { display:flex; align-items:flex-start; justify-content:space-between; padding:0 8px 18px; }
   .head h1 { font-size:19px; font-weight:700; margin:0; letter-spacing:-.01em; }
-  .head .sub { font-size:12px; color:#7f8696; margin-top:3px; }
-  .sound { background:none; border:0; cursor:pointer; color:#5b606c; font-size:12px; padding:6px; transition:color .2s ease; }
-  .sound.on { color:#6cd3a8; }
+  .head .sub { font-size:12px; color:var(--sub); margin-top:3px; }
+  .ctrls { display:flex; align-items:center; gap:4px; }
+  .icon-btn {
+    background:none; border:0; cursor:pointer; color:var(--sub); padding:6px; font-size:15px;
+    line-height:1; border-radius:8px; transition:color .2s ease, background .2s ease;
+  }
+  .icon-btn:hover { color:var(--text); background:var(--row); }
+  .sound { background:none; border:0; cursor:pointer; color:var(--handle); font-size:12px; padding:6px; transition:color .2s ease; }
+  .sound.on { color:#1fb87a; }
 
   .list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
   .row {
     display:flex; align-items:center; gap:14px; padding:10px 12px;
-    background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.05);
+    background:var(--row); border:1px solid var(--row-border);
     border-radius:16px; position:relative; user-select:none;
   }
-  .row:hover { background:rgba(255,255,255,.06); }
+  .row:hover { background:var(--row-hover); }
   .handle {
     display:flex; flex-direction:column; gap:3px; padding:6px 4px; cursor:grab;
-    touch-action:none; color:#5b606c; transition:color .2s ease;
+    touch-action:none; color:var(--handle); transition:color .2s ease;
   }
   .handle:active { cursor:grabbing; }
-  .row:hover .handle { color:#9aa0ad; }
+  .row:hover .handle { color:var(--handle-hover); }
   .handle span { display:block; width:16px; height:2px; border-radius:2px; background:currentColor; }
-  .cover { width:46px; height:46px; border-radius:12px; flex:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); }
+  .cover { width:46px; height:46px; border-radius:12px; flex:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
   .meta { flex:1; min-width:0; }
   .title { font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .artist { font-size:13px; color:#8b909c; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .dur { font-size:13px; color:#6f7480; font-variant-numeric:tabular-nums; flex:none; }
-  .hint { text-align:center; font-size:12px; color:#565c68; padding:16px 0 4px; }
+  .artist { font-size:13px; color:var(--artist); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dur { font-size:13px; color:var(--dur); font-variant-numeric:tabular-nums; flex:none; }
+  .hint { text-align:center; font-size:12px; color:var(--sub); opacity:.7; padding:16px 0 4px; }
 </style>
 </head>
-<body>
+<body data-theme="dark">
   <div id="root"></div>
 
 <script type="text/babel" data-type="module" data-presets="react">
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { Reorder, useDragControls } from "framer-motion";
 
@@ -77,6 +100,12 @@ const TRACKS = [
   { id:"e", title:"Slow Motion",    artist:"Adriel",       dur:"3:09", hue:200 },
   { id:"f", title:"Afterglow",      artist:"Nova Rey",     dur:"4:18", hue:12  },
 ];
+
+// opaque drag surface per theme so the lifted row never shows the one beneath
+const DRAG = {
+  dark:  { bg:"#262b38", shadow:"0 22px 46px rgba(0,0,0,0.6)" },
+  light: { bg:"#ffffff", shadow:"0 20px 42px rgba(18,20,40,0.22)" },
+};
 
 let actx;
 function blip() {
@@ -96,7 +125,7 @@ function blip() {
   } catch (e) {}
 }
 
-function Track({ item }) {
+function Track({ item, theme }) {
   const controls = useDragControls();
   return (
     <Reorder.Item
@@ -105,8 +134,7 @@ function Track({ item }) {
       dragListener={false}
       dragControls={controls}
       className="row"
-      whileDrag={{ scale: 1.035, backgroundColor: "rgba(255,255,255,0.08)",
-                   boxShadow: "0 22px 46px rgba(0,0,0,0.55)" }}
+      whileDrag={{ scale: 1.035, backgroundColor: DRAG[theme].bg, boxShadow: DRAG[theme].shadow }}
       transition={{ type: "spring", stiffness: 620, damping: 40 }}
     >
       <div className="handle" onPointerDown={(e) => controls.start(e)} aria-label="Drag to reorder">
@@ -127,6 +155,11 @@ function Track({ item }) {
 function App() {
   const [items, setItems] = useState(TRACKS);
   const [sound, setSound] = useState(true);
+  const [theme, setTheme] = useState(
+    () => (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark"
+  );
+
+  useEffect(() => { document.body.dataset.theme = theme; }, [theme]);
 
   const onReorder = (next) => {
     if (sound) blip();
@@ -141,12 +174,18 @@ function App() {
           <h1>Up Next</h1>
           <div className="sub">{items.length} tracks</div>
         </div>
-        <button className={"sound" + (sound ? " on" : "")}
-          onClick={() => { setSound(s => !s); if (!sound) blip(); }}>♪ sound</button>
+        <div className="ctrls">
+          <button className="icon-btn" aria-label="Toggle light or dark mode"
+            onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}>
+            {theme === "dark" ? "☀" : "☾"}
+          </button>
+          <button className={"sound" + (sound ? " on" : "")}
+            onClick={() => { setSound(s => !s); if (!sound) blip(); }}>♪ sound</button>
+        </div>
       </div>
 
       <Reorder.Group as="ul" axis="y" values={items} onReorder={onReorder} className="list">
-        {items.map((it) => <Track key={it.id} item={it} />)}
+        {items.map((it) => <Track key={it.id} item={it} theme={theme} />)}
       </Reorder.Group>
 
       <div className="hint">drag the ⋮ handle to reorder</div>
