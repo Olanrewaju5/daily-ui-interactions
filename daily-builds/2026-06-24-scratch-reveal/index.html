@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0d0f15" />
+<title>Scratch to Reveal — Day 5</title>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:radial-gradient(800px 600px at 50% -10%, #1a2030 0%, #0d0f15 60%);
+    color:#e8eaf0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased;
+  }
+  .scene { display:flex; flex-direction:column; align-items:center; gap:20px; }
+  .card {
+    position:relative; width:clamp(280px,86vw,330px); aspect-ratio:3/4;
+    border-radius:24px; overflow:hidden; box-shadow:0 30px 70px -25px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.06);
+    touch-action:none; user-select:none;
+  }
+  /* reward (underneath) */
+  .reward {
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    background:radial-gradient(120% 90% at 50% 20%, #ffe39a 0%, #ff8a5b 42%, #d6388f 78%, #7c3aed 100%);
+    color:#fff; text-align:center; padding:24px;
+  }
+  .coin { width:96px; height:96px; filter:drop-shadow(0 8px 16px rgba(0,0,0,.25)); transform:scale(.6); opacity:0; }
+  .won { font-size:15px; font-weight:600; letter-spacing:.04em; opacity:.92; text-transform:uppercase; margin-top:6px; opacity:0; }
+  .amount { font-size:46px; font-weight:800; letter-spacing:-.02em; text-shadow:0 2px 10px rgba(0,0,0,.18); opacity:0; }
+  .sub { font-size:14px; opacity:0; max-width:18em; line-height:1.4; }
+  .reward.pop .coin { animation:coinPop .7s cubic-bezier(.22,1.4,.4,1) forwards; }
+  .reward.pop .won { animation:fadeUp .5s ease .12s forwards; }
+  .reward.pop .amount { animation:fadeUp .6s cubic-bezier(.22,1.6,.4,1) .18s forwards; }
+  .reward.pop .sub { animation:fadeUp .5s ease .3s forwards; }
+  @keyframes coinPop { 0%{transform:scale(.4) rotate(-25deg);opacity:0} 60%{opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
+  @keyframes fadeUp { from{transform:translateY(10px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+  canvas.scratch { position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; }
+  canvas.fx { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .shimmer {
+    position:absolute; inset:0; pointer-events:none; opacity:.8; transition:opacity .4s ease;
+    background:linear-gradient(105deg, transparent 30%, rgba(255,255,255,.55) 47%, rgba(255,255,255,.0) 60%);
+    background-size:280% 100%; animation:sweep 2.8s linear infinite; mix-blend-mode:overlay;
+  }
+  .card.scratching .shimmer { opacity:0; }
+  @keyframes sweep { from{background-position:130% 0} to{background-position:-130% 0} }
+
+  .caption { font-size:13px; color:#8a90a0; text-align:center; }
+  .controls { display:flex; gap:10px; align-items:center; }
+  .reset {
+    background:#1b1e27; color:#e8eaf0; border:1px solid rgba(255,255,255,.08); border-radius:999px;
+    padding:11px 20px; font-size:14px; font-weight:600; cursor:pointer; opacity:0; pointer-events:none;
+    transition:opacity .3s ease, transform .15s ease, background .2s ease;
+  }
+  .reset.show { opacity:1; pointer-events:auto; }
+  .reset:hover { background:#23262f; } .reset:active { transform:scale(.97); }
+  .sound { background:none; border:0; cursor:pointer; color:#5b606c; font-size:12px; padding:8px; transition:color .2s ease; }
+  .sound.on { color:#8a8a90; }
+</style>
+</head>
+<body>
+  <div class="scene">
+    <div class="card" id="card">
+      <div class="reward" id="reward">
+        <svg class="coin" id="coin" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="g" cx="40%" cy="35%" r="75%">
+              <stop offset="0" stop-color="#fff3c4"/><stop offset="55%" stop-color="#ffd24a"/><stop offset="100%" stop-color="#e8920c"/>
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="46" fill="url(#g)" stroke="#c97c08" stroke-width="3"/>
+          <circle cx="50" cy="50" r="36" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2"/>
+          <path d="M50 28 l5.6 11.8 13 1.9 -9.4 9.1 2.2 12.9 -11.4-6 -11.4 6 2.2-12.9 -9.4-9.1 13-1.9z" fill="#fff" fill-opacity=".95"/>
+        </svg>
+        <div class="won" id="won">You won</div>
+        <div class="amount" id="amount">$5.00</div>
+        <div class="sub" id="sub">cashback added to your wallet</div>
+      </div>
+      <canvas class="scratch" id="scratch"></canvas>
+      <div class="shimmer"></div>
+      <canvas class="fx" id="fx"></canvas>
+    </div>
+    <div class="caption" id="caption">Scratch the card to reveal your reward</div>
+    <div class="controls">
+      <button class="reset" id="reset">Scratch again</button>
+      <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+    </div>
+  </div>
+
+<script>
+  const card = document.getElementById('card');
+  const sCanvas = document.getElementById('scratch');
+  const fxCanvas = document.getElementById('fx');
+  const sctx = sCanvas.getContext('2d');
+  const fxx = fxCanvas.getContext('2d');
+  const reward = document.getElementById('reward');
+  const resetBtn = document.getElementById('reset');
+  const caption = document.getElementById('caption');
+  const amountEl = document.getElementById('amount');
+
+  const PRIZES = ['$1.00','$2.00','$5.00','$10.00'];
+  let W=0, H=0, DPR=1, done=false, lastX=0, lastY=0, drawing=false;
+
+  function sizeCanvas(cv, ctx) {
+    const r = card.getBoundingClientRect();
+    W = r.width; H = r.height; DPR = Math.min(window.devicePixelRatio||1, 2);
+    cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  function drawCoating() {
+    sctx.globalCompositeOperation = 'source-over';
+    sctx.clearRect(0,0,W,H);
+    const g = sctx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,'#cfd3da'); g.addColorStop(.45,'#eef0f4'); g.addColorStop(.55,'#e2e5ea'); g.addColorStop(1,'#bcc1cb');
+    sctx.fillStyle = g; sctx.fillRect(0,0,W,H);
+    // brushed texture
+    sctx.strokeStyle = 'rgba(120,128,140,.06)'; sctx.lineWidth = 1;
+    for (let i=-H; i<W; i+=5){ sctx.beginPath(); sctx.moveTo(i,0); sctx.lineTo(i+H,H); sctx.stroke(); }
+    // label
+    sctx.fillStyle = '#8a90a0'; sctx.textAlign='center';
+    sctx.font = '700 13px ui-sans-serif, system-ui, sans-serif';
+    sctx.fillText('S C R A T C H   &   W I N', W/2, 40);
+    sctx.fillStyle = '#6b7280';
+    sctx.font = '800 22px ui-sans-serif, system-ui, sans-serif';
+    sctx.fillText('Scratch here', W/2, H/2+4);
+    sctx.font = '26px serif';
+    sctx.fillText('✦', W/2, H/2-34);
+    sctx.setTransform(DPR,0,0,DPR,0,0);
+    sctx.globalCompositeOperation = 'destination-out';
+  }
+  function init() {
+    sizeCanvas(sCanvas, sctx); sizeCanvas(fxCanvas, fxx);
+    drawCoating();
+    done = false; card.classList.remove('scratching');
+    reward.classList.remove('pop'); resetBtn.classList.remove('show');
+    caption.textContent = 'Scratch the card to reveal your reward';
+    amountEl.textContent = PRIZES[Math.floor(Math.random()*PRIZES.length)];
+  }
+
+  // ---------- audio ----------
+  let actx, soundOn = true, noiseGain, noiseFilter, noiseStarted=false;
+  function ensure(){ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); if(!noiseStarted) startNoise(); }
+  function startNoise(){
+    const len=actx.sampleRate*1.0, buf=actx.createBuffer(1,len,actx.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const src=actx.createBufferSource(); src.buffer=buf; src.loop=true;
+    noiseFilter=actx.createBiquadFilter(); noiseFilter.type='highpass'; noiseFilter.frequency.value=2600;
+    noiseGain=actx.createGain(); noiseGain.gain.value=0;
+    src.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(actx.destination);
+    src.start(); noiseStarted=true;
+  }
+  function chime(){
+    if(!soundOn) return; ensure();
+    const t=actx.currentTime, notes=[523.25,659.25,783.99,1046.5];
+    notes.forEach((f,i)=>{ const o=actx.createOscillator(),g=actx.createGain(); o.type='sine'; o.frequency.value=f;
+      const ts=t+i*0.085; g.gain.setValueAtTime(0.0001,ts); g.gain.exponentialRampToValueAtTime(0.22,ts+0.02); g.gain.exponentialRampToValueAtTime(0.0001,ts+0.5);
+      o.connect(g); g.connect(actx.destination); o.start(ts); o.stop(ts+0.55); });
+  }
+
+  // ---------- particles (sparkles + confetti) ----------
+  const parts = [];
+  const COLORS = ['#ffd24a','#ff7ab8','#7c6cff','#46d6a0','#ff9f4a','#5ec8ff'];
+  function sparkle(x,y){ for(let i=0;i<2;i++) parts.push({t:'s', x,y, vx:(Math.random()-.5)*60, vy:-30-Math.random()*60, life:0, max:.5+Math.random()*.3, size:2+Math.random()*2.5}); }
+  function confetti(){ for(let i=0;i<140;i++){ const a=Math.random()*Math.PI*2, sp=120+Math.random()*340;
+    parts.push({t:'c', x:W/2, y:H*0.46, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-160, life:0, max:1.1+Math.random()*.8, rot:Math.random()*6, vr:(Math.random()-.5)*12, w:5+Math.random()*5, h:8+Math.random()*7, c:COLORS[i%COLORS.length]}); } }
+  let lastFx=0;
+  function fxLoop(now){
+    const dt = lastFx ? Math.min((now-lastFx)/1000,1/30) : 1/60; lastFx=now;
+    fxx.clearRect(0,0,W,H);
+    for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.life+=dt;
+      if(p.life>=p.max){ parts.splice(i,1); continue; }
+      if(p.t==='s'){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=140*dt; const a=1-p.life/p.max;
+        fxx.globalAlpha=a; fxx.fillStyle='#fff7d6';
+        fxx.beginPath(); fxx.arc(p.x,p.y,p.size,0,7); fxx.fill();
+      } else { p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=520*dt; p.vx*=0.99; p.rot+=p.vr*dt; const a=Math.min(1,(p.max-p.life)*2.2);
+        fxx.globalAlpha=a; fxx.fillStyle=p.c; fxx.save(); fxx.translate(p.x,p.y); fxx.rotate(p.rot); fxx.fillRect(-p.w/2,-p.h/2,p.w,p.h); fxx.restore();
+      }
+    }
+    fxx.globalAlpha=1;
+    requestAnimationFrame(fxLoop);
+  }
+  requestAnimationFrame(fxLoop);
+
+  // ---------- scratching ----------
+  const BR = 22;
+  function pos(e){ const r=sCanvas.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
+  function scratchTo(x,y){
+    sctx.lineWidth=BR*2; sctx.lineCap='round'; sctx.lineJoin='round'; sctx.strokeStyle='#000';
+    sctx.beginPath(); sctx.moveTo(lastX,lastY); sctx.lineTo(x,y); sctx.stroke();
+    sctx.beginPath(); sctx.arc(x,y,BR,0,7); sctx.fillStyle='#000'; sctx.fill();
+    lastX=x; lastY=y;
+  }
+  let lastSample=0, lastSound=0;
+  function down(e){ if(done) return; ensure(); drawing=true; card.classList.add('scratching'); [lastX,lastY]=pos(e); scratchTo(lastX,lastY); sparkle(lastX,lastY); sCanvas.setPointerCapture?.(e.pointerId); }
+  function move(e){ if(!drawing||done) return; const [x,y]=pos(e); const speed=Math.hypot(x-lastX,y-lastY);
+    scratchTo(x,y); sparkle(x,y);
+    if(noiseGain){ noiseGain.gain.setTargetAtTime(soundOn?Math.min(0.14,speed*0.012):0, actx.currentTime, 0.03); }
+    const now=performance.now();
+    if(navigator.vibrate && now-lastSound>40){ navigator.vibrate(4); lastSound=now; }
+    if(now-lastSample>220){ lastSample=now; if(scratchedFraction()>0.5) complete(); }
+  }
+  function up(){ drawing=false; if(noiseGain) noiseGain.gain.setTargetAtTime(0, actx.currentTime, 0.05); }
+  function scratchedFraction(){
+    const data=sctx.getImageData(0,0,sCanvas.width,sCanvas.height).data;
+    let clear=0,total=0; const step=4*8;
+    for(let i=3;i<data.length;i+=step){ total++; if(data[i]<128) clear++; }
+    return clear/total;
+  }
+  function complete(){
+    if(done) return; done=true;
+    // wipe remaining coating
+    sctx.globalCompositeOperation='destination-out'; sctx.fillStyle='#000'; sctx.fillRect(0,0,W,H);
+    sCanvas.animate([{opacity:1},{opacity:0}],{duration:350,easing:'ease',fill:'forwards'});
+    reward.classList.add('pop');
+    confetti(); chime();
+    if(navigator.vibrate) navigator.vibrate([18,40,18]);
+    caption.textContent = 'Nice! ' + amountEl.textContent + ' is yours 🎉';
+    resetBtn.classList.add('show');
+  }
+
+  sCanvas.addEventListener('pointerdown', down);
+  sCanvas.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  resetBtn.addEventListener('click', () => { sCanvas.style.opacity=''; sCanvas.getAnimations?.().forEach(a=>a.cancel()); init(); });
+  const soundBtn=document.getElementById('sound');
+  soundBtn.addEventListener('click', ()=>{ soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if(soundOn){ensure();chime();} });
+  window.addEventListener('resize', () => { if(!done) init(); });
+
+  // debug hooks for headless verification
+  window.__reveal = () => complete();
+  window.__scratchSwath = () => { drawing=true; ensure?.(); for(let x=20;x<W-20;x+=10){ lastX=x-10; lastY=H/2; scratchTo(x,H/2);} drawing=false; };
+
+  init();
+</script>
+</body>
+</html>
