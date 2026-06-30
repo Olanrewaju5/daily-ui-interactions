@@ -8,6 +8,7 @@ A daily practice of unique UI interactions, micro-interactions, and animation �
 
 | Day | Build | Highlights | Tech |
 |-----|-------|-----------|------|
+| 08 | [Achievement Unlocked](./daily-builds/2026-06-24-achievement-unlocked/) | myMind-style reward — GSAP-choreographed light-ray sunburst, 3D medal pop with gloss sweep, confetti burst, staggered text, idle shimmer | GSAP timeline (3D), canvas particles, Web Audio |
 | 07 | [Morning Brew](./daily-builds/2026-06-24-gsap-brew/) | A coffee brew choreographed on one GSAP timeline — cup fills, steam rises, checkmark pops, each step offset; pour + ding audio | GSAP timeline, SVG, Web Audio |
 | 06 | [Interactive Zipper](./daily-builds/2026-06-24-interactive-zipper/) | Flashbacks-style onboarding — drag the pull to unzip a widening V of splaying teeth, revealing the screen behind; per-tooth zip clicks + reveal chime | Parametric SVG, spring drag, Web Audio |
 | 05 | [Scratch to Reveal](./daily-builds/2026-06-24-scratch-reveal/) | Google Pay–style scratch card — canvas destination-out erasing, trailing sparkles, auto-complete confetti burst + reward chime | Canvas 2D, particle system, Web Audio |
