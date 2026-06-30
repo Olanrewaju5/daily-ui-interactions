@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0d0f15" />
+<title>Interactive Zipper — Day 6</title>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:radial-gradient(800px 600px at 50% -10%, #1a2030 0%, #0d0f15 60%);
+    color:#e8eaf0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased;
+  }
+  .scene { display:flex; flex-direction:column; align-items:center; gap:18px; }
+  .device {
+    position:relative; width:clamp(300px,88vw,360px); aspect-ratio:360/520;
+    border-radius:30px; overflow:hidden; box-shadow:0 30px 70px -25px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.06);
+    touch-action:none; user-select:none;
+  }
+  /* revealed onboarding (behind the zipper) */
+  .reveal { position:absolute; inset:0; background:linear-gradient(165deg,#ffd36e 0%,#ff7a59 38%,#e0518a 70%,#7c4dff 100%); }
+  .reveal .inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#fff; text-align:center; padding:30px; }
+  .logo { font-size:13px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; opacity:.9; }
+  .photos { display:flex; gap:-10px; margin:8px 0 14px; }
+  .pola { width:88px; height:104px; background:#fff; border-radius:6px; padding:6px 6px 16px; box-shadow:0 10px 24px rgba(0,0,0,.25); }
+  .pola i { display:block; width:100%; height:100%; border-radius:3px; }
+  .pola:nth-child(1){ transform:rotate(-8deg) translateX(10px); }
+  .pola:nth-child(2){ transform:rotate(7deg) translateX(-10px); z-index:2; }
+  .reveal h2 { font-size:26px; font-weight:800; letter-spacing:-.01em; margin:6px 0 0; text-shadow:0 2px 12px rgba(0,0,0,.2); }
+  .reveal p { font-size:15px; opacity:.92; margin:6px 0 0; max-width:18em; line-height:1.45; }
+  .cta {
+    margin-top:22px; background:#1c1c1e; color:#fff; border:0; border-radius:999px; padding:14px 30px;
+    font-size:16px; font-weight:700; cursor:pointer; opacity:0; transform:translateY(12px); transition:opacity .4s ease .15s, transform .4s ease .15s;
+    box-shadow:0 10px 24px rgba(0,0,0,.25);
+  }
+  .device.done .cta { opacity:1; transform:translateY(0); }
+
+  .zip { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .device.done .zip { pointer-events:none; }
+
+  .caption { font-size:13px; color:#8a90a0; }
+  .controls { display:flex; gap:10px; align-items:center; }
+  .reset { background:#1b1e27; color:#e8eaf0; border:1px solid rgba(255,255,255,.08); border-radius:999px; padding:10px 18px; font-size:14px; font-weight:600; cursor:pointer; }
+  .reset:hover { background:#23262f; } .reset:active { transform:scale(.97); }
+  .sound { background:none; border:0; cursor:pointer; color:#5b606c; font-size:12px; padding:8px; transition:color .2s ease; }
+  .sound.on { color:#8a8a90; }
+</style>
+</head>
+<body>
+  <div class="scene">
+    <div class="device" id="device">
+      <div class="reveal">
+        <div class="inner">
+          <div class="logo">✶ Flashbacks</div>
+          <div class="photos">
+            <div class="pola"><i style="background:linear-gradient(135deg,#8ec5ff,#5b7cff)"></i></div>
+            <div class="pola"><i style="background:linear-gradient(135deg,#ffd36e,#ff7a59)"></i></div>
+          </div>
+          <h2>Relive your moments</h2>
+          <p>Unzip to step inside your memories.</p>
+          <button class="cta" id="cta">Get Started</button>
+        </div>
+      </div>
+      <svg class="zip" id="zip" viewBox="0 0 360 520" xmlns="http://www.w3.org/2000/svg" aria-label="Zipper — drag down to open">
+        <defs>
+          <linearGradient id="fab" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#2a2e38"/><stop offset="1" stop-color="#1c1f27"/>
+          </linearGradient>
+          <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f4f5f7"/><stop offset=".5" stop-color="#c2c6cf"/><stop offset="1" stop-color="#9aa0ac"/>
+          </linearGradient>
+        </defs>
+        <g id="leftHalf"><path id="leftPanel" fill="url(#fab)"/><g id="leftTeeth"></g></g>
+        <g id="rightHalf"><path id="rightPanel" fill="url(#fab)"/><g id="rightTeeth"></g></g>
+        <g id="slider"></g>
+      </svg>
+    </div>
+    <div class="caption" id="caption">Drag the zipper pull down to unzip</div>
+    <div class="controls">
+      <button class="reset" id="reset">Zip back up</button>
+      <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+    </div>
+  </div>
+
+<script>
+  const W=360, H=520, CX=180, ST=18, TW=11, MAXGAP=152;
+  const device = document.getElementById('device');
+  const svg = document.getElementById('zip');
+  const leftPanel = document.getElementById('leftPanel');
+  const rightPanel = document.getElementById('rightPanel');
+  const leftTeethG = document.getElementById('leftTeeth');
+  const rightTeethG = document.getElementById('rightTeeth');
+  const sliderG = document.getElementById('slider');
+  const leftHalf = document.getElementById('leftHalf');
+  const rightHalf = document.getElementById('rightHalf');
+
+  const easeOut = t => 1-Math.pow(1-t,3);
+  function gap(y, sy){ if (sy<=0 || y>=sy) return 0; return MAXGAP*easeOut((sy-y)/sy); }
+  const leftEdge = (y,sy)=> CX - gap(y,sy);
+  const rightEdge= (y,sy)=> CX + gap(y,sy);
+
+  // build teeth elements once
+  const leftTeeth=[], rightTeeth=[];
+  for (let y=ST*0.5; y<H; y+=ST){
+    const l=document.createElementNS(svg.namespaceURI,'polygon'); l.setAttribute('fill','#caa84e'); l.setAttribute('stroke','#9c7d2e');
+    leftTeethG.appendChild(l); leftTeeth.push({el:l,y});
+  }
+  for (let y=ST; y<H; y+=ST){
+    const r=document.createElementNS(svg.namespaceURI,'polygon'); r.setAttribute('fill','#caa84e'); r.setAttribute('stroke','#9c7d2e');
+    rightTeethG.appendChild(r); rightTeeth.push({el:r,y});
+  }
+  document.querySelectorAll('#leftTeeth polygon,#rightTeeth polygon').forEach(p=>{ p.setAttribute('stroke-width','1'); });
+
+  // slider graphic (centered at 0,0; translated by sliderY)
+  sliderG.innerHTML = `
+    <polygon points="-7,-22 7,-22 16,0 7,30 -7,30 -16,0" fill="url(#metal)" stroke="#7e8490" stroke-width="1.5"/>
+    <rect x="-15" y="-6" width="30" height="14" rx="3" fill="url(#metal)" stroke="#7e8490" stroke-width="1.5"/>
+    <path d="M0,30 q-13,8 -11,26 q2,16 11,18 q9,-2 11,-18 q2,-18 -11,-26z" fill="none" stroke="#b9bdc6" stroke-width="5"/>
+    <circle cx="0" cy="32" r="4" fill="#9aa0ac"/>`;
+
+  const tpts = (x,y,dir) => { // dir +1 left tooth points right, -1 right tooth points left
+    const h=ST*0.46, t=TW*dir;
+    return `${x},${y-h} ${x+t},${y-h*0.5} ${x+t},${y+h*0.5} ${x},${y+h}`;
+  };
+
+  function render(sy, split){
+    // panels
+    let dl='M 0 0', dr='M '+W+' 0';
+    for (let y=0; y<=H; y+=8){ dl += ' L '+ (leftEdge(y,sy)).toFixed(1)+' '+y; dr += ' L '+(rightEdge(y,sy)).toFixed(1)+' '+y; }
+    dl += ' L 0 '+H+' Z'; dr += ' L '+W+' '+H+' Z';
+    leftPanel.setAttribute('d', dl); rightPanel.setAttribute('d', dr);
+    // teeth
+    for (const t of leftTeeth){ t.el.setAttribute('points', tpts(leftEdge(t.y,sy), t.y, +1)); }
+    for (const t of rightTeeth){ t.el.setAttribute('points', tpts(rightEdge(t.y,sy), t.y, -1)); }
+    // slider position
+    sliderG.setAttribute('transform', 'translate('+CX+' '+sy+')');
+    // the two halves slide off when fully unzipped (split: 0..1)
+    leftHalf.setAttribute('transform', 'translate('+(-238*split).toFixed(1)+' 0)');
+    rightHalf.setAttribute('transform', 'translate('+(238*split).toFixed(1)+' 0)');
+    sliderG.setAttribute('opacity', (1-split).toFixed(2));
+  }
+
+  // ---------- audio: per-tooth zip clicks + reveal chime ----------
+  let actx, soundOn=true;
+  const ensure=()=>{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); };
+  function click(vol){
+    if(!soundOn) return; ensure();
+    const t=actx.currentTime, len=Math.floor(actx.sampleRate*0.012), b=actx.createBuffer(1,len,actx.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);
+    const s=actx.createBufferSource(); s.buffer=b;
+    const f=actx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=2400; f.Q.value=1.2;
+    const g=actx.createGain(); g.gain.value=Math.min(0.5,0.18+vol*0.5);
+    s.connect(f); f.connect(g); g.connect(actx.destination); s.start(t);
+  }
+  function chime(){
+    if(!soundOn) return; ensure();
+    const t=actx.currentTime, notes=[587.33,739.99,987.77];
+    notes.forEach((fr,i)=>{ const o=actx.createOscillator(),g=actx.createGain(); o.type='sine'; o.frequency.value=fr;
+      const ts=t+i*0.09; g.gain.setValueAtTime(0.0001,ts); g.gain.exponentialRampToValueAtTime(0.2,ts+0.02); g.gain.exponentialRampToValueAtTime(0.0001,ts+0.5);
+      o.connect(g); g.connect(actx.destination); o.start(ts); o.stop(ts+0.55); });
+  }
+  const soundBtn=document.getElementById('sound');
+  soundBtn.addEventListener('click', ()=>{ soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if(soundOn){ensure();click(0.4);} });
+
+  // ---------- drag + spring ----------
+  let sliderY=0, target=0, vel=0, dragging=false, done=false, lastTooth=0, lastVib=0, split=0, splitTarget=0;
+  function vbY(clientY){ const r=svg.getBoundingClientRect(); return (clientY-r.top)*(H/r.height); }
+  function grab(e){ if(done) return; ensure(); dragging=true; target=clamp(vbY(e.clientY),0,H); svg.setPointerCapture?.(e.pointerId); }
+  function moveDrag(e){ if(!dragging||done) return; target=clamp(vbY(e.clientY),0,H); }
+  function release(){ if(!dragging) return; dragging=false; target = (sliderY/H>0.55) ? H : 0; }
+  const clamp=(n,a,b)=>Math.min(Math.max(n,a),b);
+  svg.addEventListener('pointerdown', grab);
+  svg.addEventListener('pointermove', moveDrag);
+  window.addEventListener('pointerup', release);
+
+  function completeReveal(){
+    done = true; device.classList.add('done'); splitTarget = 1;
+    chime(); if(navigator.vibrate) navigator.vibrate([15,30,15]);
+    document.getElementById('caption').textContent = 'Unzipped — welcome in ✶';
+  }
+  function resetZip(){
+    done=false; device.classList.remove('done'); splitTarget = 0;
+    target=0; document.getElementById('caption').textContent='Drag the zipper pull down to unzip';
+  }
+  document.getElementById('reset').addEventListener('click', resetZip);
+
+  // debug hook
+  window.__setZip = (frac) => { target=sliderY=frac*H; vel=0; render(sliderY, split); };
+
+  let last=0;
+  function frame(now){
+    let dt = last ? (now-last)/1000 : 1/60; last=now; dt=Math.min(dt,1/30);
+    const f = -260*(sliderY-target) - 26*vel; vel+=f*dt; sliderY+=vel*dt;
+    sliderY=clamp(sliderY,0,H);
+    split += (splitTarget - split) * (1 - Math.exp(-12*dt));
+    render(sliderY, split);
+    // per-tooth click as the slider crosses teeth
+    const idx=Math.floor(sliderY/ST);
+    if(idx!==lastTooth && !done){ const speed=Math.min(1,Math.abs(vel)/900); click(speed); const now2=performance.now(); if(navigator.vibrate&&now2-lastVib>30){navigator.vibrate(3);lastVib=now2;} lastTooth=idx; }
+    if(!done && sliderY>H*0.965 && target>=H) completeReveal();
+    requestAnimationFrame(frame);
+  }
+  render(0, 0);
+  requestAnimationFrame(frame);
+
+  // make the CTA clickable feedback
+  document.getElementById('cta').addEventListener('click', ()=>{ document.getElementById('caption').textContent='🎉 Onboarding complete'; });
+</script>
+</body>
+</html>

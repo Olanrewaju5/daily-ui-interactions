@@ -8,6 +8,7 @@ A daily practice of unique UI interactions, micro-interactions, and animation �
 
 | Day | Build | Highlights | Tech |
 |-----|-------|-----------|------|
+| 06 | [Interactive Zipper](./daily-builds/2026-06-24-interactive-zipper/) | Flashbacks-style onboarding — drag the pull to unzip a widening V of splaying teeth, revealing the screen behind; per-tooth zip clicks + reveal chime | Parametric SVG, spring drag, Web Audio |
 | 05 | [Scratch to Reveal](./daily-builds/2026-06-24-scratch-reveal/) | Google Pay–style scratch card — canvas destination-out erasing, trailing sparkles, auto-complete confetti burst + reward chime | Canvas 2D, particle system, Web Audio |
 | 04 | [Proximity Drawer](./daily-builds/2026-06-24-empty-state-drawer/) | Empty-state with a hand-built isometric filing cabinet; the drawer slides open as the cursor nears, with rolling-slide + wooden-clunk audio | Hand-built SVG isometric projection, Web Audio |
 | 03 | [Expanding Cards](./daily-builds/2026-06-24-expanding-cards/) | Destinations grid that morph-expands into a detail view and back — shared-element transition with no FLIP math | React, Framer Motion (layoutId + AnimatePresence) |
