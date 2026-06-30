@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#f3ece1" />
+<title>Morning Brew — GSAP Timeline · Day 7</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:#e7ddcd; color:#4a3422;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased;
+  }
+  .card {
+    width:100%; max-width:380px; background:#f6f0e6; border-radius:28px; padding:28px 28px 30px;
+    box-shadow:0 24px 50px -24px rgba(74,52,34,.5), 0 0 0 1px rgba(74,52,34,.05);
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+  .eyebrow { text-transform:uppercase; letter-spacing:.24em; font-size:12px; font-weight:700; color:#b09a80; }
+  .scene { width:min(280px,72vw); }
+  .scene svg { display:block; width:100%; height:auto; overflow:visible; }
+  .caption { font-size:14px; color:#9a866d; min-height:1.4em; }
+  .btn {
+    margin-top:8px; background:#6f4326; color:#f6f0e6; border:0; border-radius:999px;
+    padding:14px 34px; font-size:16px; font-weight:700; letter-spacing:.01em; cursor:pointer;
+    box-shadow:0 10px 22px -8px rgba(111,67,38,.6); transition:background .2s ease, transform .12s ease;
+  }
+  .btn:hover { background:#7d4c2b; } .btn:active { transform:scale(.97); }
+  .btn:disabled { opacity:.6; cursor:default; }
+  .sound { position:fixed; bottom:18px; right:20px; background:none; border:0; cursor:pointer; color:#b3a48d; font-size:12px; padding:8px; transition:color .2s ease; }
+  .sound.on { color:#8a7459; }
+  .steam { fill:none; stroke:#c9bca8; stroke-width:5; stroke-linecap:round; opacity:0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="eyebrow">Morning Brew</div>
+    <div class="scene">
+      <svg viewBox="0 0 260 240" xmlns="http://www.w3.org/2000/svg" aria-label="A cup of coffee">
+        <defs>
+          <clipPath id="cupClip"><path d="M88,98 L172,98 L165,182 Q164,187 158,187 L102,187 Q96,187 95,182 Z"/></clipPath>
+        </defs>
+        <!-- steam -->
+        <g id="steamG">
+          <path class="steam" d="M118,92 q-9,-13 0,-26 q9,-13 0,-26"/>
+          <path class="steam" d="M130,92 q-9,-13 0,-26 q9,-13 0,-26"/>
+          <path class="steam" d="M142,92 q-9,-13 0,-26 q9,-13 0,-26"/>
+        </g>
+        <!-- saucer -->
+        <ellipse cx="130" cy="200" rx="74" ry="13" fill="#e7dccb"/>
+        <ellipse cx="130" cy="198" rx="60" ry="9" fill="#efe7da"/>
+        <!-- cup group -->
+        <g id="cup">
+          <!-- liquid (clipped, fills via scaleY) -->
+          <g clip-path="url(#cupClip)">
+            <rect id="liquid" x="88" y="96" width="86" height="93" fill="#6f4326"/>
+            <rect id="crema" x="88" y="96" width="86" height="8" fill="#8a5a33"/>
+          </g>
+          <!-- cup body -->
+          <path d="M84,94 L176,94 L168,184 Q166,192 156,192 L104,192 Q94,192 92,184 Z" fill="none" stroke="#caa07a" stroke-width="5" stroke-linejoin="round"/>
+          <ellipse cx="130" cy="94" rx="46" ry="9" fill="#fff" stroke="#caa07a" stroke-width="5"/>
+          <!-- handle -->
+          <path d="M176,108 q34,2 33,32 q-1,28 -33,28" fill="none" stroke="#caa07a" stroke-width="5"/>
+        </g>
+        <!-- check badge -->
+        <g id="checkBadge" transform="translate(182,84)">
+          <circle r="20" fill="#34b27b"/>
+          <path id="checkPath" d="M-9,1 L-3,8 L10,-7" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+    </div>
+    <div class="caption" id="caption">Tap brew for a fresh cup</div>
+    <button class="btn" id="brew">Brew ☕</button>
+  </div>
+  <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+
+<script>
+  const brewBtn = document.getElementById('brew');
+  const caption = document.getElementById('caption');
+  let state = 'idle', steamTweens = [];
+
+  // initial empty state
+  gsap.set('#liquid', { scaleY:0, transformOrigin:'50% 100%' });
+  gsap.set('#crema',  { scaleY:0, transformOrigin:'50% 100%', opacity:0 });
+  gsap.set('#checkBadge', { scale:0, transformOrigin:'50% 50%' });
+  gsap.set('.steam', { opacity:0 });
+  const checkLen = document.getElementById('checkPath').getTotalLength();
+  gsap.set('#checkPath', { strokeDasharray:checkLen, strokeDashoffset:checkLen });
+
+  // ---------- audio ----------
+  let actx, soundOn=true;
+  const ensure=()=>{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); };
+  function pour(dur){
+    if(!soundOn) return; ensure();
+    const t=actx.currentTime, len=Math.floor(actx.sampleRate*dur), b=actx.createBuffer(1,len,actx.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const s=actx.createBufferSource(); s.buffer=b;
+    const f=actx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=700; f.Q.value=.7;
+    const g=actx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.07,t+0.2); g.gain.setValueAtTime(0.07,t+dur-0.25); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    // gurgle: wobble the filter
+    f.frequency.setValueAtTime(500,t); f.frequency.linearRampToValueAtTime(950,t+dur);
+    s.connect(f); f.connect(g); g.connect(actx.destination); s.start(t); s.stop(t+dur);
+  }
+  function ding(){
+    if(!soundOn) return; ensure();
+    const t=actx.currentTime, notes=[784,1175];
+    notes.forEach((fr,i)=>{ const o=actx.createOscillator(),g=actx.createGain(); o.type='sine'; o.frequency.value=fr;
+      const ts=t+i*0.10; g.gain.setValueAtTime(0.0001,ts); g.gain.exponentialRampToValueAtTime(0.2,ts+0.02); g.gain.exponentialRampToValueAtTime(0.0001,ts+0.6);
+      o.connect(g); g.connect(actx.destination); o.start(ts); o.stop(ts+0.65); });
+  }
+  const soundBtn=document.getElementById('sound');
+  soundBtn.addEventListener('click', ()=>{ soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if(soundOn){ensure();ding();} });
+
+  // ---------- steam loop ----------
+  function startSteam(){
+    steamTweens.push(gsap.to('.steam', { opacity:.6, duration:.5, stagger:.18 }));
+    steamTweens.push(gsap.to('.steam', { yPercent:-26, duration:2.4, ease:'sine.inOut', repeat:-1, yoyo:true, stagger:.3 }));
+    steamTweens.push(gsap.to('.steam', { scaleX:1.25, duration:1.8, ease:'sine.inOut', repeat:-1, yoyo:true, stagger:.25, transformOrigin:'50% 100%' }));
+  }
+  function stopSteam(){ steamTweens.forEach(t=>t.kill()); steamTweens=[]; gsap.set('.steam',{ opacity:0, yPercent:0, scaleX:1 }); }
+
+  // ---------- the brew timeline ----------
+  function brew(){
+    state='brewing'; brewBtn.disabled=true; brewBtn.textContent='Brewing…'; caption.textContent='Pouring…';
+    ensure();
+    const tl = gsap.timeline({ onComplete(){ state='done'; brewBtn.disabled=false; brewBtn.textContent='Brew again'; caption.textContent='Your coffee is ready ☕'; } });
+    window.__tl = tl;
+    tl.to('#cup', { y:-5, duration:.18, ease:'power2.out' })
+      .to('#cup', { y:0, duration:.7, ease:'elastic.out(1,.4)' })
+      .add(()=>pour(1.15), '<')
+      .to('#liquid', { scaleY:.9, duration:1.15, ease:'power1.inOut' }, '<')
+      .to('#crema',  { scaleY:.9, opacity:1, duration:1.15, ease:'power1.inOut' }, '<')
+      .add(startSteam, '-=.45')
+      .to('#cup', { x:-2, duration:.07, repeat:3, yoyo:true, ease:'none' }, '-=.2')   // little wobble as it settles
+      .set('#caption', {}, '+=.05')
+      .add(()=>{ caption.textContent='Almost there…'; })
+      .to('#checkBadge', { scale:1, duration:.5, ease:'back.out(2.2)' }, '+=.1')
+      .to('#checkPath', { strokeDashoffset:0, duration:.35, ease:'power2.out' }, '-=.2')
+      .add(()=>ding(), '-=.3');
+  }
+  function reset(){
+    state='idle'; stopSteam();
+    gsap.killTweensOf(['#cup','#liquid','#crema','#checkBadge','#checkPath']);
+    gsap.to(['#liquid','#crema'], { scaleY:0, duration:.5, ease:'power2.in' });
+    gsap.to('#crema', { opacity:0, duration:.3 });
+    gsap.to('#checkBadge', { scale:0, duration:.3, ease:'back.in(2)' });
+    gsap.set('#checkPath', { strokeDashoffset:checkLen });
+    gsap.set('#cup', { x:0, y:0 });
+    brewBtn.textContent='Brew ☕'; caption.textContent='Tap brew for a fresh cup';
+  }
+  brewBtn.addEventListener('click', ()=>{ if(state==='brewing') return; if(state==='done') reset(); else brew(); });
+
+  // debug hook: jump timeline to its end for headless verification
+  window.__finish = () => { if(window.__tl){ window.__tl.progress(1); startSteam(); } };
+</script>
+</body>
+</html>
