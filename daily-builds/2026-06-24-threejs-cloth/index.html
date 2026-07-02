@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0a0a12" />
+<title>Cloth in the Wind — Three.js · Day 10</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:radial-gradient(900px 700px at 50% 0%, #1c1836 0%, #0c0a18 55%, #070610 100%);
+    color:#e8eaf0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased;
+  }
+  .scene { display:flex; flex-direction:column; align-items:center; gap:16px; }
+  .frame {
+    position:relative; width:clamp(320px,92vw,640px); aspect-ratio:3/2; border-radius:24px; overflow:hidden;
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.06); cursor:crosshair; touch-action:none;
+  }
+  .frame canvas { display:block; width:100%; height:100%; }
+  .frame .kick { position:absolute; left:20px; top:16px; font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:rgba(255,255,255,.7); pointer-events:none; }
+  .caption { font-size:13px; color:#7f8696; }
+  .sound { position:fixed; bottom:18px; right:20px; background:none; border:0; cursor:pointer; color:#5b606c; font-size:12px; padding:8px; transition:color .2s ease; }
+  .sound.on { color:#8a8a90; }
+  .err { position:absolute; inset:0; display:none; place-items:center; padding:24px; color:#ff8a8a; font:12px ui-monospace,monospace; text-align:center; }
+</style>
+</head>
+<body>
+  <div class="scene">
+    <div class="frame" id="frame">
+      <div class="kick">Day 10 · Three.js</div>
+      <div class="err" id="err"></div>
+    </div>
+    <div class="caption">A Verlet cloth in the wind — move your cursor across it to push the fabric</div>
+  </div>
+  <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+
+<script>
+  const frame = document.getElementById('frame'), errBox = document.getElementById('err');
+  if (!window.THREE){ errBox.style.display='grid'; errBox.textContent='Three.js failed to load'; }
+
+  // ---------- cloth parameters ----------
+  const xSegs=30, ySegs=22, rest=22;
+  const clothW = xSegs*rest, clothH = ySegs*rest;
+  const MASS=0.1, DRAG=0.97, ITER=3;
+  const TS=18/1000, TS2=TS*TS;
+  const gravity = new THREE.Vector3(0,-981,0).multiplyScalar(MASS); // ~ -98
+
+  function idx(u,v){ return v*(xSegs+1)+u; }
+  class Particle {
+    constructor(u,v){ this.u=u; this.v=v;
+      const x=u*rest - clothW/2, y=-(v*rest) + clothH/2;
+      this.pos=new THREE.Vector3(x,y,0); this.prev=this.pos.clone(); this.a=new THREE.Vector3();
+      this.pinned = (v===0); this.pinPos=this.pos.clone();
+    }
+    integrate(){ if(this.pinned) return;
+      const px=this.pos.x, py=this.pos.y, pz=this.pos.z;
+      this.pos.x += (this.pos.x-this.prev.x)*DRAG + this.a.x*TS2;
+      this.pos.y += (this.pos.y-this.prev.y)*DRAG + this.a.y*TS2;
+      this.pos.z += (this.pos.z-this.prev.z)*DRAG + this.a.z*TS2;
+      this.prev.set(px,py,pz);
+    }
+  }
+  const particles=[], pinned=[], constraints=[];
+  for(let v=0; v<=ySegs; v++) for(let u=0; u<=xSegs; u++){ const p=new Particle(u,v); particles.push(p); if(p.pinned) pinned.push(p); }
+  const link=(a,b)=>{ const p1=particles[a], p2=particles[b]; constraints.push([p1,p2,p1.pos.distanceTo(p2.pos)]); };
+  for(let v=0; v<=ySegs; v++) for(let u=0; u<=xSegs; u++){
+    if(u<xSegs) link(idx(u,v), idx(u+1,v));            // structural →
+    if(v<ySegs) link(idx(u,v), idx(u,v+1));            // structural ↓
+    if(u<xSegs && v<ySegs){ link(idx(u,v), idx(u+1,v+1)); link(idx(u+1,v), idx(u,v+1)); } // shear ⤫
+  }
+
+  const _d=new THREE.Vector3();
+  function satisfy(c){ const [p1,p2,restLen]=c; _d.subVectors(p2.pos,p1.pos); const len=_d.length(); if(len===0) return;
+    const diff=(len-restLen)/len;
+    if(!p1.pinned) p1.pos.addScaledVector(_d, diff*0.5);
+    if(!p2.pinned) p2.pos.addScaledVector(_d, -diff*0.5);
+  }
+
+  // ---------- three scene ----------
+  let renderer, scene, camera, geo, mesh, DPR=1;
+  const posAttr = new Float32Array(particles.length*3);
+  const wind = new THREE.Vector3();
+  const mouseWorld = new THREE.Vector3(1e6,1e6,1e6); let mouseActive=false; const MR=95;
+  const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), plane=new THREE.Plane(new THREE.Vector3(0,0,1),0), hit=new THREE.Vector3();
+
+  function makeTexture(){
+    const c=document.createElement('canvas'); c.width=256; c.height=256; const g=c.getContext('2d');
+    const grd=g.createLinearGradient(0,0,40,256); grd.addColorStop(0,'#ff5f6d'); grd.addColorStop(.45,'#ff8a3d'); grd.addColorStop(.75,'#ffc23d'); grd.addColorStop(1,'#ff6ea9');
+    g.fillStyle=grd; g.fillRect(0,0,256,256);
+    const glow=g.createRadialGradient(90,80,10,120,120,220); glow.addColorStop(0,'rgba(255,255,255,.35)'); glow.addColorStop(1,'rgba(255,255,255,0)');
+    g.fillStyle=glow; g.fillRect(0,0,256,256);
+    const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t;
+  }
+
+  function init(){
+    renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setClearColor(0x000000, 0);
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(32, 1.5, 1, 6000);
+    camera.position.set(0, 90, 1230); camera.lookAt(0, -40, 0);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const key=new THREE.DirectionalLight(0xffffff, 1.05); key.position.set(-350, 380, 650); scene.add(key);
+    const fill=new THREE.DirectionalLight(0x87a8ff, 0.45); fill.position.set(400, -120, 350); scene.add(fill);
+    const rim=new THREE.DirectionalLight(0xffd6a0, 0.35); rim.position.set(0, 200, -600); scene.add(rim);
+
+    geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(posAttr, 3));
+    const uv=new Float32Array(particles.length*2);
+    for(const p of particles){ const i=idx(p.u,p.v); uv[i*2]=p.u/xSegs; uv[i*2+1]=1-p.v/ySegs; }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv,2));
+    const indices=[];
+    for(let v=0; v<ySegs; v++) for(let u=0; u<xSegs; u++){ const a=idx(u,v), b=idx(u+1,v), c=idx(u,v+1), d=idx(u+1,v+1);
+      indices.push(a,c,b, b,c,d); }
+    geo.setIndex(indices);
+
+    const mat = new THREE.MeshPhongMaterial({ map:makeTexture(), side:THREE.DoubleSide, shininess:16, specular:0x2a2a2a });
+    mesh = new THREE.Mesh(geo, mat); scene.add(mesh);
+
+    // a thin top rod (the "pole")
+    const rod=new THREE.Mesh(new THREE.CylinderGeometry(5,5,clothW+40,12), new THREE.MeshPhongMaterial({color:0x3a3f4c,shininess:60}));
+    rod.rotation.z=Math.PI/2; rod.position.set(0, clothH/2, 0); scene.add(rod);
+
+    frame.appendChild(renderer.domElement);
+    sync(); addEventListener('resize', sync);
+    frame.addEventListener('pointermove', onMove);
+    frame.addEventListener('pointerdown', e=>{ ensure(); onMove(e); });
+    frame.addEventListener('pointerleave', ()=>{ mouseActive=false; });
+    requestAnimationFrame(loop);
+  }
+  function sync(){
+    DPR=Math.min(devicePixelRatio||1,2); const r=frame.getBoundingClientRect(); if(r.width<1) return;
+    renderer.setPixelRatio(DPR); renderer.setSize(r.width, r.height, false);
+    camera.aspect=r.width/r.height; camera.updateProjectionMatrix();
+  }
+  function onMove(e){ const r=frame.getBoundingClientRect(); ndc.x=((e.clientX-r.left)/r.width)*2-1; ndc.y=-((e.clientY-r.top)/r.height)*2+1;
+    ray.setFromCamera(ndc,camera); if(ray.ray.intersectPlane(plane,hit)){ mouseWorld.copy(hit); mouseActive=true; } }
+
+  function simulate(t){
+    const ws = 120 + 90*Math.cos(t*0.6);
+    wind.set(Math.sin(t*0.7)*0.55, Math.cos(t*0.5)*0.18, 1).normalize().multiplyScalar(ws);
+    for(const p of particles){ p.a.copy(gravity); p.a.add(wind); p.a.z += 210*Math.sin(p.u*0.55 - t*4.2 + p.v*0.25); }
+    for(const p of particles) p.integrate();
+    for(let it=0; it<ITER; it++){
+      for(const c of constraints) satisfy(c);
+      if(mouseActive) for(const p of particles){ _d.subVectors(p.pos, mouseWorld); const dl=_d.length(); if(dl<MR && dl>0){ p.pos.addScaledVector(_d, (MR-dl)/dl); } }
+    }
+    for(const p of pinned) p.pos.copy(p.pinPos);
+  }
+  function draw(){
+    for(const p of particles){ const i=idx(p.u,p.v)*3; posAttr[i]=p.pos.x; posAttr[i+1]=p.pos.y; posAttr[i+2]=p.pos.z; }
+    geo.attributes.position.needsUpdate=true; geo.computeVertexNormals();
+    renderer.render(scene, camera);
+  }
+
+  // ---------- audio: gentle wind ----------
+  let actx, soundOn=true, windGain, windFilter, started=false;
+  const ensure=()=>{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); if(!started) startWind(); };
+  function startWind(){ const len=actx.sampleRate*2, b=actx.createBuffer(1,len,actx.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1; const s=actx.createBufferSource(); s.buffer=b; s.loop=true;
+    windFilter=actx.createBiquadFilter(); windFilter.type='lowpass'; windFilter.frequency.value=500; windFilter.Q.value=2;
+    windGain=actx.createGain(); windGain.gain.value=0; s.connect(windFilter); windFilter.connect(windGain); windGain.connect(actx.destination); s.start(); started=true; }
+  const soundBtn=document.getElementById('sound');
+  soundBtn.addEventListener('click', ()=>{ soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if(soundOn) ensure(); else if(windGain) windGain.gain.setTargetAtTime(0,actx.currentTime,0.2); });
+
+  const start=performance.now();
+  function loop(now){
+    const t=(now-start)/1000;
+    sync();
+    simulate(t); draw();
+    if(windGain && soundOn){ const w=(120+90*Math.cos(t*0.6))/210; windGain.gain.setTargetAtTime(0.02+0.05*w+(mouseActive?0.03:0), actx.currentTime, 0.2); windFilter.frequency.setTargetAtTime(360+380*w, actx.currentTime, 0.3); }
+    requestAnimationFrame(loop);
+  }
+
+  // debug: advance the sim without relying on rAF (headless screenshot)
+  window.__warm = (n=200) => { for(let i=0;i<n;i++) simulate(i*0.05 + 3); draw(); };
+
+  if (window.THREE) { try { init(); } catch(e){ errBox.style.display='grid'; errBox.textContent=String(e && e.stack || e); } }
+</script>
+</body>
+</html>

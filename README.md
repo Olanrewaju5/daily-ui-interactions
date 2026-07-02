@@ -8,6 +8,7 @@ A daily practice of unique UI interactions, micro-interactions, and animation �
 
 | Day | Build | Highlights | Tech |
 |-----|-------|-----------|------|
+| 10 | [Cloth in the Wind](./daily-builds/2026-06-24-threejs-cloth/) | Real-time Verlet cloth in Three.js — particle grid + distance constraints, traveling wind, gravity drape, cursor-push collision, lit folds | Three.js, Verlet integration |
 | 09 | [Liquid Light](./daily-builds/2026-06-24-liquid-shader/) | Raw GLSL fragment shader — domain-warped fBm noise → iridescent palette, cursor-reactive swirl + glow, rendered per-pixel on the GPU | WebGL, GLSL |
 | 08 | [Achievement Unlocked](./daily-builds/2026-06-24-achievement-unlocked/) | myMind-style reward — GSAP-choreographed light-ray sunburst, 3D medal pop with gloss sweep, confetti burst, staggered text, idle shimmer | GSAP timeline (3D), canvas particles, Web Audio |
 | 07 | [Morning Brew](./daily-builds/2026-06-24-gsap-brew/) | A coffee brew choreographed on one GSAP timeline — cup fills, steam rises, checkmark pops, each step offset; pour + ding audio | GSAP timeline, SVG, Web Audio |
