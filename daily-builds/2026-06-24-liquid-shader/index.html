@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#07070c" />
+<title>Liquid Light — WebGL Shader · Day 9</title>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:#07070c; color:#e8eaf0;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased;
+  }
+  .scene { display:flex; flex-direction:column; align-items:center; gap:16px; }
+  .frame {
+    position:relative; width:clamp(300px,92vw,560px); aspect-ratio:4/5; border-radius:26px; overflow:hidden;
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.06); cursor:crosshair; touch-action:none;
+  }
+  .frame canvas { display:block; width:100%; height:100%; }
+  .frame .label {
+    position:absolute; left:22px; bottom:20px; font-size:13px; letter-spacing:.02em; color:rgba(255,255,255,.85);
+    text-shadow:0 1px 8px rgba(0,0,0,.6); pointer-events:none; font-weight:600;
+  }
+  .frame .kick { position:absolute; left:22px; top:20px; font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:rgba(255,255,255,.7); text-shadow:0 1px 8px rgba(0,0,0,.6); pointer-events:none; }
+  .caption { font-size:13px; color:#7f8696; }
+  .sound { position:fixed; bottom:18px; right:20px; background:none; border:0; cursor:pointer; color:#5b606c; font-size:12px; padding:8px; transition:color .2s ease; }
+  .sound.on { color:#8a8a90; }
+  .err { position:absolute; inset:0; display:none; place-items:center; padding:24px; color:#ff8a8a; font:12px ui-monospace,monospace; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+  <div class="scene">
+    <div class="frame" id="frame">
+      <canvas id="gl"></canvas>
+      <div class="kick">Day 09 · WebGL</div>
+      <div class="label">Move your cursor through the light</div>
+      <div class="err" id="err"></div>
+    </div>
+    <div class="caption">A domain-warped noise field on the GPU — reacts to your cursor in real time</div>
+  </div>
+  <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+
+<script id="vs" type="x-shader/x-vertex">
+attribute vec2 a_pos;
+void main(){ gl_Position = vec4(a_pos, 0.0, 1.0); }
+</script>
+<script id="fs" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2  u_res;
+uniform float u_time;
+uniform vec2  u_mouse;   // in pixels, gl_FragCoord space (y up)
+uniform float u_energy;  // 0..1 cursor speed
+
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  float a = hash(i), b = hash(i+vec2(1.0,0.0)), c = hash(i+vec2(0.0,1.0)), d = hash(i+vec2(1.0,1.0));
+  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  for(int i=0;i<4;i++){ v += a*noise(p); p = p*2.03 + 7.1; a *= 0.5; }
+  return v;
+}
+vec3 pal(float t){
+  return 0.5 + 0.5*cos(6.28318*(vec3(1.0)*t + vec3(0.00, 0.35, 0.62)));
+}
+void main(){
+  vec2 uv = gl_FragCoord.xy / u_res.xy;
+  vec2 p  = (gl_FragCoord.xy - 0.5*u_res.xy) / u_res.y;
+  vec2 m  = (u_mouse - 0.5*u_res.xy) / u_res.y;
+
+  float t = u_time * 0.09;
+
+  // cursor influence: local glow + gentle swirl
+  vec2 toM = p - m;
+  float dm = length(toM);
+  float infl = exp(-dm*3.2);
+  p += vec2(-toM.y, toM.x) * infl * (0.35 + u_energy*0.6);   // swirl around cursor
+  p += normalize(toM + 1e-4) * infl * 0.10;                  // slight push
+
+  // domain warp (flowing liquid)
+  vec2 q = vec2(fbm(p*1.6 + t), fbm(p*1.6 + vec2(5.2,1.3) - t));
+  vec2 r = vec2(fbm(p*1.6 + 2.0*q + vec2(1.7,9.2) + 0.5*t), fbm(p*1.6 + 2.0*q + vec2(8.3,2.8) - 0.4*t));
+  float f = fbm(p*1.6 + 3.0*r);
+
+  float idx = f + 0.18*length(r) + u_time*0.015 + infl*0.5;
+  vec3 col = pal(idx);
+  col *= 0.5 + 0.7*f;                                        // depth
+  col += infl * (0.35 + u_energy*0.5) * vec3(1.0, 0.92, 0.8);// glow core
+  col *= 1.0 - 0.35*length(uv-0.5);                          // vignette
+  col += (hash(gl_FragCoord.xy + u_time) - 0.5) * 0.03;      // grain
+  gl_FragColor = vec4(max(col, 0.0), 1.0);
+}
+</script>
+
+<script>
+  const canvas = document.getElementById('gl');
+  const frame = document.getElementById('frame');
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  const errBox = document.getElementById('err');
+  window.__shaderError = null;
+
+  if (!gl) { errBox.style.display='grid'; errBox.textContent='WebGL not available'; }
+
+  function compile(type, src){
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){ window.__shaderError = gl.getShaderInfoLog(s); console.error('shader:', window.__shaderError); }
+    return s;
+  }
+
+  let uRes, uTime, uMouse, uEnergy, DPR=1;
+  function init(){
+    const vs = compile(gl.VERTEX_SHADER, document.getElementById('vs').textContent);
+    const fs = compile(gl.FRAGMENT_SHADER, document.getElementById('fs').textContent);
+    const prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+    if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){ window.__shaderError = (window.__shaderError||'') + ' | link: ' + gl.getProgramInfoLog(prog); }
+    if (window.__shaderError){ errBox.style.display='grid'; errBox.textContent = window.__shaderError; return; }
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a_pos'); gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+    uRes = gl.getUniformLocation(prog,'u_res');
+    uTime = gl.getUniformLocation(prog,'u_time');
+    uMouse = gl.getUniformLocation(prog,'u_mouse');
+    uEnergy = gl.getUniformLocation(prog,'u_energy');
+
+    resize(); addEventListener('resize', resize);
+    requestAnimationFrame(loop);
+  }
+
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1, 1.5);
+    const r = frame.getBoundingClientRect();
+    canvas.width = Math.round(r.width*DPR); canvas.height = Math.round(r.height*DPR);
+    gl.viewport(0,0,canvas.width,canvas.height);
+    if (mouse.x===0 && mouse.y===0){ mouse.x=canvas.width/2; mouse.y=canvas.height/2; sm.x=mouse.x; sm.y=mouse.y; }
+  }
+
+  // pointer (gl_FragCoord has origin bottom-left → flip Y)
+  const mouse={x:0,y:0}, sm={x:0,y:0}; let energy=0, targetEnergy=0;
+  function setMouse(clientX, clientY){
+    const r = frame.getBoundingClientRect();
+    const nx = (clientX - r.left)*DPR, ny = canvas.height - (clientY - r.top)*DPR;
+    const dx = nx-mouse.x, dy = ny-mouse.y;
+    targetEnergy = Math.min(1, Math.hypot(dx,dy)/ (28*DPR));
+    mouse.x = nx; mouse.y = ny;
+    flow();
+  }
+  frame.addEventListener('pointermove', e => setMouse(e.clientX, e.clientY));
+  frame.addEventListener('pointerdown', e => { ensure(); setMouse(e.clientX, e.clientY); });
+
+  // ---------- audio: soft flow that swells with cursor speed ----------
+  let actx, soundOn=true, flowGain, flowFilter, started=false;
+  const ensure=()=>{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); if(!started) startFlow(); };
+  function startFlow(){
+    const len=actx.sampleRate*1.5, b=actx.createBuffer(1,len,actx.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const src=actx.createBufferSource(); src.buffer=b; src.loop=true;
+    flowFilter=actx.createBiquadFilter(); flowFilter.type='lowpass'; flowFilter.frequency.value=380; flowFilter.Q.value=3;
+    flowGain=actx.createGain(); flowGain.gain.value=0;
+    src.connect(flowFilter); flowFilter.connect(flowGain); flowGain.connect(actx.destination);
+    src.start(); started=true;
+  }
+  function flow(){ if(!soundOn) return; ensure(); }
+  const soundBtn=document.getElementById('sound');
+  soundBtn.addEventListener('click', ()=>{ soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if(soundOn) ensure(); else if(flowGain) flowGain.gain.setTargetAtTime(0,actx.currentTime,0.1); });
+
+  // ---------- render loop ----------
+  const start = performance.now();
+  function loop(now){
+    const t = (now - start)/1000;
+    // self-heal canvas size (covers 0-size-at-init / resize)
+    const r = frame.getBoundingClientRect();
+    const w = Math.round(r.width*DPR), h = Math.round(r.height*DPR);
+    if (w>0 && (w!==canvas.width || h!==canvas.height)){ canvas.width=w; canvas.height=h; gl.viewport(0,0,w,h); if(mouse.x===0){ mouse.x=sm.x=w/2; mouse.y=sm.y=h/2; } }
+    // smooth mouse + energy
+    sm.x += (mouse.x - sm.x)*0.12; sm.y += (mouse.y - sm.y)*0.12;
+    targetEnergy *= 0.94; energy += (targetEnergy - energy)*0.1;
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, t);
+    gl.uniform2f(uMouse, sm.x, sm.y);
+    gl.uniform1f(uEnergy, energy);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (flowGain && soundOn){ flowGain.gain.setTargetAtTime(Math.min(0.08, energy*0.1), actx.currentTime, 0.05); if(flowFilter) flowFilter.frequency.setTargetAtTime(300 + energy*900, actx.currentTime, 0.08); }
+    requestAnimationFrame(loop);
+  }
+
+  // debug hook: place cursor influence for headless screenshots
+  window.__setMouse = (fx, fy, e=0.6) => { mouse.x=sm.x=fx*canvas.width; mouse.y=sm.y=(1-fy)*canvas.height; energy=e; };
+
+  if (gl) init();
+</script>
+</body>
+</html>
