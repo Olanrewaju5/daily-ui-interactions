@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1026" />
+<title>Grow — GSAP ScrollTrigger · Day 11</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  body { background:#0b1026; color:#fff; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif; -webkit-font-smoothing:antialiased; }
+
+  .pinwrap { height:100vh; overflow:hidden; }
+  .stage { position:relative; height:100vh; width:100%; overflow:hidden; }
+
+  .sky { position:absolute; inset:0; }
+  .sky1 { background:linear-gradient(180deg,#0b1026 0%,#1c2140 100%); }
+  .sky2 { background:linear-gradient(180deg,#3a1e5c 0%,#ff7e5f 100%); opacity:0; }
+  .sky3 { background:linear-gradient(180deg,#4a90e2 0%,#bfe6ff 100%); opacity:0; }
+  .sky4 { background:linear-gradient(180deg,#ffb347 0%,#ffe29a 100%); opacity:0; }
+  .sun { position:absolute; left:50%; top:56%; width:120px; height:120px; margin-left:-60px; border-radius:50%;
+    background:radial-gradient(circle at 50% 45%, #fff6d8, #ffd166 55%, #ff9e42 100%); box-shadow:0 0 80px 30px rgba(255,190,90,.4); }
+
+  .plantwrap { position:absolute; left:50%; bottom:0; width:min(340px,80vw); transform:translateX(-50%); }
+  .plantwrap svg { display:block; width:100%; height:auto; }
+  .ground { position:absolute; left:0; right:0; bottom:0; height:16%; background:linear-gradient(180deg,#5a4327,#3a2a17); }
+  .ground::before { content:""; position:absolute; left:50%; bottom:60%; width:150px; height:70px; margin-left:-75px; border-radius:50%; background:#4a3620; }
+
+  .beats { position:absolute; left:0; right:0; top:9%; text-align:center; padding:0 24px; pointer-events:none; }
+  .beat { position:absolute; left:0; right:0; }
+  .beat h2 { font-size:clamp(28px,6vw,46px); font-weight:800; letter-spacing:-.02em; margin:0; text-shadow:0 2px 20px rgba(0,0,0,.35); }
+  .beat p { font-size:clamp(14px,2.6vw,17px); margin:10px 0 0; opacity:.9; text-shadow:0 1px 12px rgba(0,0,0,.4); }
+
+  .rail { position:absolute; right:22px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .track { position:relative; width:4px; height:160px; border-radius:4px; background:rgba(255,255,255,.22); overflow:hidden; }
+  .fill { position:absolute; left:0; top:0; width:100%; height:0%; background:#fff; border-radius:4px; }
+  .dots { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between; }
+  .dot { width:10px; height:10px; margin-left:-3px; border-radius:50%; background:rgba(255,255,255,.35); transition:background .2s, transform .2s; }
+  .dot.on { background:#fff; transform:scale(1.3); }
+
+  .hint { position:absolute; left:50%; bottom:26px; transform:translateX(-50%); font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.75); }
+  .hint span { display:inline-block; animation:bob 1.6s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(5px)} }
+
+  .outro { height:70vh; display:grid; place-items:center; text-align:center; background:linear-gradient(180deg,#ffe29a,#f6f0e6); color:#5a4327; }
+  .outro h2 { font-size:34px; margin:0 0 6px; }
+  .outro p { margin:0; color:#9a866d; }
+  .sound { position:fixed; bottom:16px; right:18px; z-index:10; background:rgba(0,0,0,.25); border:0; cursor:pointer; color:#fff; font-size:12px; padding:8px 10px; border-radius:20px; }
+  .sound.on { color:#fff; } .sound.off { opacity:.6; }
+</style>
+</head>
+<body>
+  <div class="pinwrap" id="pinwrap">
+    <div class="stage" id="stage">
+      <div class="sky sky1"></div><div class="sky sky2"></div><div class="sky sky3"></div><div class="sky sky4"></div>
+      <div class="sun"></div>
+
+      <div class="beats">
+        <div class="beat beat-1"><h2>The Seed</h2><p>Everything starts small, in the dark.</p></div>
+        <div class="beat beat-2"><h2>First Light</h2><p>A little warmth, and it begins.</p></div>
+        <div class="beat beat-3"><h2>Reaching Up</h2><p>Day by day, toward the light.</p></div>
+        <div class="beat beat-4"><h2>In Bloom</h2><p>Patience — and then, all at once.</p></div>
+      </div>
+
+      <div class="ground"></div>
+      <div class="plantwrap">
+        <svg viewBox="0 0 300 420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="stemG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#3c8f57"/><stop offset="1" stop-color="#6fd08a"/></linearGradient>
+            <radialGradient id="petalG" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#ffd0e4"/><stop offset="60%" stop-color="#ff8fb8"/><stop offset="100%" stop-color="#ff5f9e"/></radialGradient>
+            <linearGradient id="leafG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6fd08a"/><stop offset="1" stop-color="#3c8f57"/></linearGradient>
+          </defs>
+          <path id="stem" d="M150,410 C 118,346 182,286 150,224 C 128,182 168,166 150,140" fill="none" stroke="url(#stemG)" stroke-width="11" stroke-linecap="round"/>
+          <ellipse class="leaf leaf-a" cx="112" cy="300" rx="34" ry="14" fill="url(#leafG)" transform="rotate(-24 150 300)"/>
+          <ellipse class="leaf leaf-b" cx="188" cy="242" rx="34" ry="14" fill="url(#leafG)" transform="rotate(24 150 242)"/>
+          <g id="flower"></g>
+        </svg>
+      </div>
+
+      <div class="rail">
+        <div class="track"><div class="fill" id="fill"></div></div>
+      </div>
+      <div class="rail" style="right:16px;"><div class="dots">
+        <span class="dot" data-i="0"></span><span class="dot" data-i="1"></span><span class="dot" data-i="2"></span><span class="dot" data-i="3"></span>
+      </div></div>
+
+      <div class="hint" id="hint">scroll <span>&darr;</span></div>
+    </div>
+  </div>
+
+  <section class="outro">
+    <div><h2>🌱 Grown.</h2><p>Scroll back up to replay.</p></div>
+  </section>
+
+  <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+
+<script>
+  const ns='http://www.w3.org/2000/svg', flowerG=document.getElementById('flower'), FC={x:150,y:140};
+  for(let i=0;i<6;i++){ const a=(i/6)*Math.PI*2 - Math.PI/2, px=FC.x+Math.cos(a)*20, py=FC.y+Math.sin(a)*20;
+    const e=document.createElementNS(ns,'ellipse'); e.setAttribute('cx',px); e.setAttribute('cy',py); e.setAttribute('rx',13); e.setAttribute('ry',24);
+    e.setAttribute('transform',`rotate(${a*180/Math.PI+90} ${px} ${py})`); e.setAttribute('class','petal'); e.setAttribute('fill','url(#petalG)'); flowerG.appendChild(e); }
+  const fcenter=document.createElementNS(ns,'circle'); fcenter.setAttribute('cx',FC.x); fcenter.setAttribute('cy',FC.y); fcenter.setAttribute('r',12); fcenter.setAttribute('fill','#ffd45e'); fcenter.setAttribute('id','fcenter'); flowerG.appendChild(fcenter);
+
+  // ---------- audio: soft rising pad + a bloom chime ----------
+  let actx, soundOn=true, padGain, padOsc=[];
+  const ensure=()=>{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); if(!padOsc.length) startPad(); };
+  function startPad(){ padGain=actx.createGain(); padGain.gain.value=0; const filt=actx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=700;
+    [146.83,220,293.66].forEach(f=>{ const o=actx.createOscillator(); o.type='sine'; o.frequency.value=f; o.connect(padGain); o.start(); padOsc.push(o); });
+    padGain.connect(filt); filt.connect(actx.destination); }
+  function chime(){ if(!soundOn) return; ensure(); const t=actx.currentTime, notes=[587.33,880,1174.7];
+    notes.forEach((f,i)=>{ const o=actx.createOscillator(),g=actx.createGain(); o.type='triangle'; o.frequency.value=f; const ts=t+i*0.08;
+      g.gain.setValueAtTime(0.0001,ts); g.gain.exponentialRampToValueAtTime(0.2,ts+0.02); g.gain.exponentialRampToValueAtTime(0.0001,ts+0.6); o.connect(g); g.connect(actx.destination); o.start(ts); o.stop(ts+0.65); }); }
+  const soundBtn=document.getElementById('sound');
+  soundBtn.addEventListener('click', ()=>{ soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); soundBtn.classList.toggle('off',!soundOn); if(soundOn) ensure(); else if(padGain) padGain.gain.setTargetAtTime(0,actx.currentTime,0.3); });
+  addEventListener('pointerdown', ()=>{ if(soundOn) ensure(); }, {once:true});
+
+  // ---------- ScrollTrigger timeline ----------
+  gsap.registerPlugin(ScrollTrigger);
+  const stem=document.getElementById('stem'), stemLen=stem.getTotalLength();
+  gsap.set(stem,{ strokeDasharray:stemLen, strokeDashoffset:stemLen });
+  gsap.set(['.leaf-a'],{ transformOrigin:'150px 300px', scale:0 });
+  gsap.set(['.leaf-b'],{ transformOrigin:'150px 242px', scale:0 });
+  gsap.set('#flower',{ svgOrigin:'150 140', scale:0 });
+  gsap.set(['.beat-2','.beat-3','.beat-4'],{ opacity:0, y:20 });
+  let bloomed=false;
+
+  const tl = gsap.timeline({
+    scrollTrigger:{
+      trigger:'#pinwrap', start:'top top', end:'+=3200', pin:true, scrub:1,
+      snap:{ snapTo:[0, 1/3, 2/3, 1], duration:{min:0.15,max:0.5}, delay:0.04, ease:'power1.inOut' },
+      onUpdate: self => {
+        const p=self.progress; document.getElementById('fill').style.height=(p*100)+'%';
+        const active=Math.min(3, Math.round(p*3));
+        document.querySelectorAll('.dot').forEach(d=> d.classList.toggle('on', +d.dataset.i===active));
+        gsap.to('#hint',{opacity: p>0.02?0:1, duration:.2, overwrite:true});
+        if(padGain && soundOn){ padGain.gain.setTargetAtTime(0.02+0.05*p, actx.currentTime, 0.2); }
+        if(p>0.92 && !bloomed){ bloomed=true; chime(); } if(p<0.85) bloomed=false;
+      }
+    }
+  });
+  window.__tl = tl;
+
+  // sky crossfades
+  tl.to('.sky1',{opacity:0,duration:1},0.5).to('.sky2',{opacity:1,duration:1},0.5)
+    .to('.sky2',{opacity:0,duration:1},1.5).to('.sky3',{opacity:1,duration:1},1.5)
+    .to('.sky3',{opacity:0,duration:1},2.5).to('.sky4',{opacity:1,duration:1},2.5);
+  // sun rises
+  tl.fromTo('.sun',{yPercent:120,opacity:.25},{yPercent:-46,opacity:1,ease:'none',duration:3},0);
+  // stem draws
+  tl.to(stem,{strokeDashoffset:0,ease:'none',duration:2.3},0.3);
+  // leaves
+  tl.to('.leaf-a',{scale:1,duration:.5,ease:'back.out(2)'},1.0)
+    .to('.leaf-b',{scale:1,duration:.5,ease:'back.out(2)'},1.6);
+  // flower bloom — scale + rotate the whole group so petals keep their outward orientation
+  tl.fromTo('#flower',{scale:0,rotation:-40},{scale:1,rotation:0,svgOrigin:'150 140',duration:.75,ease:'back.out(1.7)'},2.45);
+  // text beats
+  tl.to('.beat-1',{opacity:0,y:-20,duration:.4},0.85)
+    .to('.beat-2',{opacity:1,y:0,duration:.4},1.0).to('.beat-2',{opacity:0,y:-20,duration:.4},1.85)
+    .to('.beat-3',{opacity:1,y:0,duration:.4},2.0).to('.beat-3',{opacity:0,y:-20,duration:.4},2.5)
+    .to('.beat-4',{opacity:1,y:0,duration:.4},2.7);
+
+  ScrollTrigger.refresh();
+
+  // debug: freeze scroll-driving and seek for headless screenshots
+  window.__seek = (p) => { if(tl.scrollTrigger) tl.scrollTrigger.disable(false); tl.progress(p); document.getElementById('fill').style.height=(p*100)+'%'; };
+</script>
+</body>
+</html>
