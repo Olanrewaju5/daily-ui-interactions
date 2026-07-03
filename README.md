@@ -8,6 +8,7 @@ A daily practice of unique UI interactions, micro-interactions, and animation �
 
 | Day | Build | Highlights | Tech |
 |-----|-------|-----------|------|
+| 12 | [Holographic Achievement](./daily-builds/2026-06-24-holographic-achievement/) | myMind-style holographic achievement card — playful drop-in bounce, cursor-tilt 3D with a color-dodge foil sheen + moving glare that shifts as you turn it | CSS 3D transforms, blend-mode holographic foil |
 | 11 | [Grow — Scroll Story](./daily-builds/2026-06-24-scrolltrigger-grow/) | Pinned scroll-driven story (GSAP ScrollTrigger) — plant grows seed→bloom across 4 beats, sky crossfades, stem draws, snap-to-beat + progress rail | GSAP ScrollTrigger (pin, scrub, snap) |
 | 10 | [Cloth in the Wind](./daily-builds/2026-06-24-threejs-cloth/) | Real-time Verlet cloth in Three.js — particle grid + distance constraints, traveling wind, gravity drape, cursor-push collision, lit folds | Three.js, Verlet integration |
 | 09 | [Liquid Light](./daily-builds/2026-06-24-liquid-shader/) | Raw GLSL fragment shader — domain-warped fBm noise → iridescent palette, cursor-reactive swirl + glow, rendered per-pixel on the GPU | WebGL, GLSL |
