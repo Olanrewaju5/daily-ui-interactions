@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#f2efe9" />
-<title>Achievement Unlocked — Holographic · Day 12</title>
+<title>Achievement Unlocked — Flip & Reveal · Day 12</title>
 <style>
   * { box-sizing:border-box; }
   html, body { height:100%; margin:0; }
@@ -14,7 +14,7 @@
     display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased; overflow:hidden;
   }
   .scene { display:flex; flex-direction:column; align-items:center; gap:26px; }
-  .stage { perspective:1000px; width:clamp(260px,78vw,320px); }
+  .stage { perspective:1100px; width:clamp(260px,78vw,320px); }
 
   .drop { transform-style:preserve-3d; will-change:transform; }
   .drop.in { animation:drop 1.05s cubic-bezier(.5,1.2,.4,1) both; }
@@ -26,32 +26,35 @@
     100% { transform:translateY(0)    rotateZ(0)   scale(1); opacity:1; }
   }
 
-  .tilt {
-    position:relative; aspect-ratio:5/7; border-radius:22px; transform-style:preserve-3d; will-change:transform;
+  .tilt { position:relative; aspect-ratio:5/7; transform-style:preserve-3d; will-change:transform; cursor:pointer; }
+  .flipper { position:absolute; inset:0; transform-style:preserve-3d; transition:transform .85s cubic-bezier(.4,.9,.3,1); }
+  .flipper.flipped { transform:rotateY(180deg); }
+
+  .face {
+    position:absolute; inset:0; border-radius:22px; overflow:hidden;
+    -webkit-backface-visibility:hidden; backface-visibility:hidden;
+    box-shadow:0 30px 60px -24px rgba(60,50,90,.45);
+  }
+
+  /* ---- FRONT: holographic card ---- */
+  .front {
     background:linear-gradient(160deg,#eef0f6 0%,#d7dbe8 48%,#c4c9db 100%);
     box-shadow:0 30px 60px -24px rgba(60,50,90,.45), 0 0 0 1px rgba(255,255,255,.7) inset, 0 2px 3px rgba(255,255,255,.9) inset;
-    overflow:hidden; cursor:pointer;
   }
-  /* holographic foil */
-  .tilt::before{
+  .front::before{
     content:""; position:absolute; inset:0; border-radius:inherit; z-index:1; pointer-events:none;
     background:repeating-linear-gradient(110deg,
       hsla(0,100%,72%,.55) 0%, hsla(52,100%,72%,.55) 10%, hsla(120,90%,70%,.55) 20%,
       hsla(190,100%,70%,.55) 30%, hsla(255,100%,76%,.55) 40%, hsla(320,100%,74%,.55) 50%, hsla(0,100%,72%,.55) 60%);
-    background-size:280% 280%;
-    background-position:var(--fx,50%) var(--fy,50%);
+    background-size:280% 280%; background-position:var(--fx,50%) var(--fy,50%);
     mix-blend-mode:color-dodge; opacity:var(--fop,.42);
   }
-  /* moving glare */
-  .tilt::after{
+  .front::after{
     content:""; position:absolute; inset:0; border-radius:inherit; z-index:3; pointer-events:none;
     background:radial-gradient(circle at var(--mx,50%) var(--my,30%), rgba(255,255,255,.9), rgba(255,255,255,0) 42%);
     mix-blend-mode:soft-light;
   }
-  .content {
-    position:relative; z-index:2; height:100%; padding:26px 22px 20px;
-    display:flex; flex-direction:column; align-items:center; text-align:center;
-  }
+  .content { position:relative; z-index:2; height:100%; padding:26px 22px 20px; display:flex; flex-direction:column; align-items:center; text-align:center; }
   .badge {
     width:78px; height:78px; border-radius:50%; margin-top:8px; display:grid; place-items:center;
     background:conic-gradient(from 140deg,#ffd76b,#ff8ac2,#8ab4ff,#7df0c0,#ffd76b);
@@ -62,99 +65,152 @@
   .name { font-size:30px; font-weight:800; letter-spacing:-.02em; margin:6px 0 0; }
   .sub  { font-size:13px; color:#6f6b64; margin:6px 0 0; }
   .spacer { flex:1; }
-  .brand { font-size:12px; font-weight:700; letter-spacing:.04em; color:#a7a29a; }
+  .fliphint { font-size:11px; font-weight:600; letter-spacing:.08em; color:#a29ee0; }
+  .brand { font-size:12px; font-weight:700; letter-spacing:.04em; color:#a7a29a; margin-top:6px; }
   .brand b { color:#4a4640; }
-
   .sparkle { position:absolute; z-index:4; pointer-events:none; color:#fff; filter:drop-shadow(0 0 4px rgba(255,255,255,.9)); opacity:0; }
   .drop.in .sparkle { animation:tw 2.4s ease-in-out infinite; }
-  .sparkle:nth-child(1){ top:14%; left:16%; animation-delay:.6s; }
-  .sparkle:nth-child(2){ top:30%; right:14%; animation-delay:1.2s; }
-  .sparkle:nth-child(3){ bottom:22%; left:22%; animation-delay:1.8s; }
+  .sparkle:nth-of-type(1){ top:15%; left:16%; animation-delay:.6s; }
+  .sparkle:nth-of-type(2){ top:30%; right:14%; animation-delay:1.2s; }
+  .sparkle:nth-of-type(3){ bottom:24%; left:22%; animation-delay:1.8s; }
   @keyframes tw { 0%,100%{opacity:0; transform:scale(.4)} 50%{opacity:.9; transform:scale(1)} }
 
-  .replay {
-    background:#1f1d1a; color:#faf8f4; border:0; border-radius:999px; padding:12px 26px; font-size:14px; font-weight:600; cursor:pointer;
-    transition:transform .14s ease, background .2s ease; box-shadow:0 10px 22px -10px rgba(31,29,26,.6);
+  /* ---- BACK: the award ---- */
+  .back {
+    transform:rotateY(180deg);
+    background:radial-gradient(120% 100% at 50% 22%, #4a3a7e 0%, #2a1f57 55%, #180f38 100%);
+    color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:26px 20px;
+    box-shadow:0 30px 60px -24px rgba(30,16,60,.7), 0 0 0 1px rgba(255,255,255,.08) inset;
   }
+  .back .rays { position:absolute; inset:0; z-index:0; pointer-events:none; opacity:.5;
+    background:conic-gradient(from 0deg, rgba(255,220,140,.0) 0deg, rgba(255,220,140,.22) 8deg, rgba(255,220,140,0) 16deg,
+      rgba(255,220,140,0) 30deg, rgba(255,220,140,.22) 38deg, rgba(255,220,140,0) 46deg);
+    background-size:100% 100%; mask:radial-gradient(circle at 50% 40%, #000 0, #000 42%, transparent 70%); -webkit-mask:radial-gradient(circle at 50% 40%, #000 0, #000 42%, transparent 70%);
+    animation:spin 24s linear infinite; }
+  @keyframes spin { to{ transform:rotate(360deg);} }
+  .back > * { position:relative; z-index:1; }
+  .medal svg { width:120px; height:150px; filter:drop-shadow(0 10px 18px rgba(0,0,0,.4)); }
+  .rankkick { font-size:11px; font-weight:700; letter-spacing:.24em; text-transform:uppercase; color:#ffd06b; margin-top:4px; }
+  .rankname { font-size:30px; font-weight:800; letter-spacing:-.02em; margin:2px 0 0; }
+  .pill { margin-top:10px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:6px 14px; font-size:13px; font-weight:700; }
+  .level { font-size:12px; color:#b9b3e0; margin-top:10px; }
+
+  .confetti { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50; }
+
+  .replay { background:#1f1d1a; color:#faf8f4; border:0; border-radius:999px; padding:12px 26px; font-size:14px; font-weight:600; cursor:pointer; transition:transform .14s ease, background .2s ease; box-shadow:0 10px 22px -10px rgba(31,29,26,.6); }
   .replay:hover { background:#000; transform:translateY(-2px); } .replay:active { transform:translateY(0) scale(.97); }
   .hint { font-size:12px; color:#a7a29a; margin-top:-12px; }
-  .sound { position:fixed; bottom:18px; right:20px; background:none; border:0; cursor:pointer; color:#bdb8ad; font-size:12px; padding:8px; }
+  .sound { position:fixed; bottom:18px; right:20px; background:none; border:0; cursor:pointer; color:#bdb8ad; font-size:12px; padding:8px; z-index:60; }
   .sound.on { color:#8a857a; }
 </style>
 </head>
 <body>
+  <canvas class="confetti" id="confetti"></canvas>
   <div class="scene">
     <div class="stage">
       <div class="drop" id="drop">
         <div class="tilt" id="tilt">
-          <div class="content">
-            <div class="badge">
-              <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><path d="M20 4l4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L20 27.4l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5z" fill="#fff"/></svg>
+          <div class="flipper" id="flipper">
+            <!-- FRONT -->
+            <div class="face front">
+              <div class="content">
+                <div class="badge">
+                  <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><path d="M20 4l4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L20 27.4l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5z" fill="#fff"/></svg>
+                </div>
+                <div class="kick">Achievement Unlocked</div>
+                <div class="name">Curator</div>
+                <div class="sub">You saved your 100th card</div>
+                <div class="spacer"></div>
+                <div class="fliphint">tap to reveal your award &#8594;</div>
+                <div class="brand">my<b>Mind</b></div>
+              </div>
+              <div class="sparkle" style="font-size:16px">&#10022;</div>
+              <div class="sparkle" style="font-size:12px">&#10022;</div>
+              <div class="sparkle" style="font-size:14px">&#10022;</div>
             </div>
-            <div class="kick">Achievement Unlocked</div>
-            <div class="name">Curator</div>
-            <div class="sub">You saved your 100th card</div>
-            <div class="spacer"></div>
-            <div class="brand">my<b>Mind</b></div>
+            <!-- BACK -->
+            <div class="face back">
+              <div class="rays"></div>
+              <div class="medal">
+                <svg viewBox="0 0 120 150" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="gold" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#ffe79c"/><stop offset="48%" stop-color="#f7c25a"/><stop offset="100%" stop-color="#e8920c"/></linearGradient>
+                  </defs>
+                  <path d="M44 66 L30 138 L52 122 L60 146 L74 96 Z" fill="#5b6bd6"/>
+                  <path d="M76 66 L90 138 L68 122 L60 146 L46 96 Z" fill="#e2455f"/>
+                  <circle cx="60" cy="56" r="42" fill="url(#gold)" stroke="#c97e1a" stroke-width="3"/>
+                  <circle cx="60" cy="56" r="33" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5"/>
+                  <path d="M60 32 l6.2 12.6 13.9 2 -10 9.8 2.4 13.8L60 76.4l-12.5 6.6 2.4-13.8-10-9.8 13.9-2z" fill="#fff" fill-opacity=".96"/>
+                </svg>
+              </div>
+              <div class="rankkick">Rank Unlocked</div>
+              <div class="rankname">Curator</div>
+              <div class="pill">+500 points</div>
+              <div class="level">Level 5 &middot; Collector's Circle</div>
+            </div>
           </div>
-          <div class="sparkle" style="font-size:16px">✦</div>
-          <div class="sparkle" style="font-size:12px">✦</div>
-          <div class="sparkle" style="font-size:14px">✦</div>
         </div>
       </div>
     </div>
-    <div class="hint">tilt the card with your cursor</div>
-    <button class="replay" id="replay">Replay</button>
+    <div class="hint">tilt to shimmer &middot; click to flip</div>
+    <button class="replay" id="replay">Replay entrance</button>
   </div>
-  <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+  <button class="sound on" id="sound" aria-label="Toggle sound">&#9834; sound</button>
 
 <script>
-  const drop = document.getElementById('drop'), tilt = document.getElementById('tilt');
+  const drop=document.getElementById('drop'), tilt=document.getElementById('tilt'), flipper=document.getElementById('flipper');
 
   // ---------- audio ----------
   let actx, soundOn=true;
   const ensure=()=>{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); };
-  function pop(){ if(!soundOn) return; ensure(); const t=actx.currentTime;
-    const o=actx.createOscillator(),g=actx.createGain(); o.type='sine'; o.frequency.setValueAtTime(300,t); o.frequency.exponentialRampToValueAtTime(760,t+.12);
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(.28,t+.02); g.gain.exponentialRampToValueAtTime(0.0001,t+.3);
-    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+.32); }
-  function shimmer(){ if(!soundOn) return; ensure(); const t=actx.currentTime, notes=[1046.5,1318.5,1568,2093];
-    notes.forEach((f,i)=>{ const o=actx.createOscillator(),g=actx.createGain(); o.type='triangle'; o.frequency.value=f; const ts=t+.12+i*0.06;
-      g.gain.setValueAtTime(0.0001,ts); g.gain.exponentialRampToValueAtTime(.12,ts+.02); g.gain.exponentialRampToValueAtTime(0.0001,ts+.5); o.connect(g); g.connect(actx.destination); o.start(ts); o.stop(ts+.55); }); }
+  function pop(){ if(!soundOn) return; ensure(); const t=actx.currentTime; const o=actx.createOscillator(),g=actx.createGain(); o.type='sine'; o.frequency.setValueAtTime(300,t); o.frequency.exponentialRampToValueAtTime(760,t+.12); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(.26,t+.02); g.gain.exponentialRampToValueAtTime(0.0001,t+.3); o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+.32); }
+  function shimmer(){ if(!soundOn) return; ensure(); const t=actx.currentTime, notes=[1046.5,1318.5,1568,2093]; notes.forEach((f,i)=>{ const o=actx.createOscillator(),g=actx.createGain(); o.type='triangle'; o.frequency.value=f; const ts=t+i*0.06; g.gain.setValueAtTime(0.0001,ts); g.gain.exponentialRampToValueAtTime(.11,ts+.02); g.gain.exponentialRampToValueAtTime(0.0001,ts+.5); o.connect(g); g.connect(actx.destination); o.start(ts); o.stop(ts+.55); }); }
+  function fanfare(){ if(!soundOn) return; ensure(); const t=actx.currentTime, notes=[523.25,659.25,783.99,1046.5,1318.5]; notes.forEach((f,i)=>{ const o=actx.createOscillator(),o2=actx.createOscillator(),g=actx.createGain(); o.type='triangle'; o2.type='sine'; o.frequency.value=f; o2.frequency.value=f*2; const ts=t+i*0.09; g.gain.setValueAtTime(0.0001,ts); g.gain.exponentialRampToValueAtTime(.17,ts+.02); g.gain.exponentialRampToValueAtTime(0.0001,ts+.6); o.connect(g); o2.connect(g); g.connect(actx.destination); o.start(ts); o.stop(ts+.65); o2.start(ts); o2.stop(ts+.65); }); }
   const soundBtn=document.getElementById('sound');
   soundBtn.addEventListener('click',()=>{ soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if(soundOn){ ensure(); shimmer(); } });
 
+  // ---------- confetti ----------
+  const cv=document.getElementById('confetti'), cx=cv.getContext('2d'); let CW=0,CH=0,DPR=1;
+  function sizeC(){ DPR=Math.min(devicePixelRatio||1,2); CW=innerWidth; CH=innerHeight; cv.width=CW*DPR; cv.height=CH*DPR; cx.setTransform(DPR,0,0,DPR,0,0); }
+  sizeC(); addEventListener('resize', sizeC);
+  const parts=[]; const COLORS=['#ffd24a','#ff7ab8','#9b8bff','#5ee0b0','#ff9f4a','#6cc6ff'];
+  function burstConfetti(){ const r=tilt.getBoundingClientRect(), ox=r.left+r.width/2, oy=r.top+r.height/2;
+    for(let i=0;i<150;i++){ const a=Math.random()*Math.PI*2, sp=180+Math.random()*440; parts.push({t:'c',x:ox,y:oy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-160,life:0,max:1.2+Math.random()*.9,rot:Math.random()*6,vr:(Math.random()-.5)*12,w:6+Math.random()*6,h:9+Math.random()*8,c:COLORS[i%COLORS.length]}); }
+    for(let i=0;i<28;i++){ const a=Math.random()*Math.PI*2, sp=80+Math.random()*260; parts.push({t:'s',x:ox,y:oy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0,max:.7+Math.random()*.4,size:2+Math.random()*2.6}); } }
+  let lastFx=0;
+  function fxLoop(now){ const dt=lastFx?Math.min((now-lastFx)/1000,1/30):1/60; lastFx=now; cx.clearRect(0,0,CW,CH);
+    for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.life+=dt; if(p.life>=p.max){parts.splice(i,1);continue;}
+      if(p.t==='c'){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=560*dt; p.vx*=.99; p.rot+=p.vr*dt; cx.globalAlpha=Math.min(1,(p.max-p.life)*2.2); cx.fillStyle=p.c; cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot); cx.fillRect(-p.w/2,-p.h/2,p.w,p.h); cx.restore(); }
+      else { p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=.94; p.vy*=.94; cx.globalAlpha=1-p.life/p.max; cx.fillStyle='#fff7d6'; cx.beginPath(); cx.arc(p.x,p.y,p.size,0,7); cx.fill(); } }
+    cx.globalAlpha=1; requestAnimationFrame(fxLoop); }
+  requestAnimationFrame(fxLoop);
+
+  // ---------- flip ----------
+  let flipped=false;
+  tilt.addEventListener('click', ()=>{ ensure(); flipped=!flipped; flipper.classList.toggle('flipped',flipped);
+    if(flipped){ burstConfetti(); fanfare(); } else { pop(); } });
+
   // ---------- tilt + holographic ----------
-  let active=false, lastMove=0;
-  let trx=0, try_=0, crx=0, cry=0;        // target/current tilt
-  let gx=50, gy=30, cgx=50, cgy=30;       // glare pos
-  const MAX=14;
-  function onMove(e){ active=true; lastMove=performance.now();
-    const r=tilt.getBoundingClientRect(); const px=(e.clientX-r.left)/r.width, py=(e.clientY-r.top)/r.height;
-    try_ = (px-0.5)*2*MAX; trx = -(py-0.5)*2*MAX; gx=px*100; gy=py*100;
-    if(soundOn) ensure();
-  }
+  let active=false, lastMove=0, trx=0, try_=0, crx=0, cry=0, gx=50, gy=30, cgx=50, cgy=30; const MAX=13;
+  function onMove(e){ active=true; lastMove=performance.now(); const r=tilt.getBoundingClientRect(); const px=(e.clientX-r.left)/r.width, py=(e.clientY-r.top)/r.height; try_=(px-0.5)*2*MAX; trx=-(py-0.5)*2*MAX; gx=px*100; gy=py*100; if(soundOn) ensure(); }
   tilt.addEventListener('pointermove', onMove);
   tilt.addEventListener('pointerleave', ()=>{ active=false; });
-
   function frame(now){
     if(active && now-lastMove>1300) active=false;
     if(!active){ const t=now/1000; try_=Math.sin(t*0.7)*8; trx=Math.cos(t*0.55)*5; gx=50+Math.sin(t*0.7)*22; gy=32+Math.cos(t*0.55)*14; }
     crx+=(trx-crx)*0.09; cry+=(try_-cry)*0.09; cgx+=(gx-cgx)*0.12; cgy+=(gy-cgy)*0.12;
     tilt.style.transform=`rotateX(${crx.toFixed(2)}deg) rotateY(${cry.toFixed(2)}deg)`;
-    tilt.style.setProperty('--fx', (50 - cry*2.4).toFixed(1)+'%');
-    tilt.style.setProperty('--fy', (50 + crx*2.4).toFixed(1)+'%');
-    tilt.style.setProperty('--fop', (0.36 + Math.min(0.34,(Math.abs(crx)+Math.abs(cry))/42)).toFixed(3));
-    tilt.style.setProperty('--mx', cgx.toFixed(1)+'%');
-    tilt.style.setProperty('--my', cgy.toFixed(1)+'%');
+    tilt.style.setProperty('--fx',(50-cry*2.4).toFixed(1)+'%'); tilt.style.setProperty('--fy',(50+crx*2.4).toFixed(1)+'%');
+    tilt.style.setProperty('--fop',(0.36+Math.min(0.34,(Math.abs(crx)+Math.abs(cry))/42)).toFixed(3));
+    tilt.style.setProperty('--mx',cgx.toFixed(1)+'%'); tilt.style.setProperty('--my',cgy.toFixed(1)+'%');
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
   // ---------- entrance ----------
-  function play(){ drop.classList.remove('in'); void drop.offsetWidth; drop.classList.add('in'); ensure(); setTimeout(()=>{ pop(); shimmer(); }, 430); }
+  function play(){ if(flipped){ flipped=false; flipper.classList.remove('flipped'); } drop.classList.remove('in'); void drop.offsetWidth; drop.classList.add('in'); ensure(); setTimeout(()=>{ pop(); shimmer(); }, 430); }
   document.getElementById('replay').addEventListener('click', play);
-  window.__play = play;
+  window.__play = play; window.__flip = ()=>tilt.click();
   play();
 </script>
 </body>
