@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#12101a" />
+<title>Candy Jar — Matter.js Physics · Day 14</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:radial-gradient(120% 100% at 50% 0%, #21182f 0%, #14101e 55%, #0c0913 100%);
+    color:#e8eaf0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    display:grid; place-items:center; padding:24px; -webkit-font-smoothing:antialiased;
+  }
+  .scene { display:flex; flex-direction:column; align-items:center; gap:18px; }
+  .jar {
+    position:relative; width:clamp(300px,84vw,400px); aspect-ratio:5/6; border-radius:26px; overflow:hidden;
+    background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+    box-shadow:0 40px 80px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.08) inset; touch-action:none;
+  }
+  .jar canvas { display:block; width:100%; height:100%; }
+  .jar .kick { position:absolute; left:20px; top:16px; font-size:11px; letter-spacing:.26em; text-transform:uppercase; color:rgba(255,255,255,.5); pointer-events:none; z-index:2; }
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  .btn {
+    background:rgba(255,255,255,.08); color:#e8eaf0; border:1px solid rgba(255,255,255,.14); border-radius:999px;
+    padding:11px 20px; font-size:14px; font-weight:600; cursor:pointer; transition:background .2s ease, transform .12s ease;
+  }
+  .btn:hover { background:rgba(255,255,255,.15); } .btn:active { transform:scale(.96); }
+  .btn.primary { background:#efeaff; color:#231b3a; border-color:transparent; }
+  .btn.primary:hover { background:#fff; }
+  .caption { font-size:12px; color:#7f8696; }
+  .sound { position:fixed; bottom:18px; right:20px; background:none; border:0; cursor:pointer; color:#5b606c; font-size:12px; padding:8px; }
+  .sound.on { color:#8a8a90; }
+</style>
+</head>
+<body>
+  <div class="scene">
+    <div class="jar" id="jar"><div class="kick">Day 14 · Matter.js</div></div>
+    <div class="controls">
+      <button class="btn primary" id="drop">Drop candy</button>
+      <button class="btn" id="shake">Shake</button>
+      <button class="btn" id="reset">Reset</button>
+    </div>
+    <div class="caption">Drag to fling · shake to jumble · every bump plinks</div>
+  </div>
+  <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+
+<script>
+  const { Engine, Render, Runner, Bodies, Body, Composite, Mouse, MouseConstraint, Events, Vector, Common } = Matter;
+  const jar = document.getElementById('jar');
+  let W = jar.clientWidth, H = jar.clientHeight;
+
+  const engine = Engine.create();
+  engine.gravity.y = 1;
+  const render = Render.create({
+    element: jar, engine,
+    options: { width:W, height:H, background:'transparent', wireframes:false, pixelRatio: Math.min(window.devicePixelRatio||1, 2) }
+  });
+  Render.run(render);
+  const runner = Runner.create();
+  Runner.run(runner, engine);
+
+  // walls (invisible) — bodies bounce off the card edges; top left open for dropping
+  const wallOpts = { isStatic:true, render:{ visible:false }, restitution:.4, friction:.4 };
+  let walls = [];
+  function buildWalls(){
+    Composite.remove(engine.world, walls);
+    walls = [
+      Bodies.rectangle(W/2, H+100, W+400, 200, wallOpts),   // floor
+      Bodies.rectangle(-100, H/2, 200, H*3, wallOpts),      // left
+      Bodies.rectangle(W+100, H/2, 200, H*3, wallOpts),     // right
+      Bodies.rectangle(W/2, -260, W+400, 200, wallOpts),    // ceiling (well above, so drops fall in)
+    ];
+    Composite.add(engine.world, walls);
+  }
+  buildWalls();
+
+  const PALETTE = ['#ff8fab','#ffb26b','#ffe066','#8ce99a','#74c0fc','#b197fc','#ff9ff3','#ff6b6b','#63e6be'];
+  const dyn = [];
+  function spawn(x, y){
+    const c = Common.choose(PALETTE);
+    const kind = Math.random();
+    const s = 16 + Math.random()*16;
+    const opt = { restitution:.5, friction:.05, frictionAir:.002, render:{ fillStyle:c, strokeStyle:'rgba(0,0,0,.18)', lineWidth:2 } };
+    let b;
+    if (kind < 0.5)      b = Bodies.circle(x, y, s, opt);
+    else if (kind < 0.8) b = Bodies.rectangle(x, y, s*1.9, s*1.9, { ...opt, chamfer:{ radius:s*0.6 } });
+    else                 b = Bodies.polygon(x, y, 3+Math.floor(Math.random()*4), s*1.15, { ...opt, chamfer:{ radius:6 } });
+    Body.setAngularVelocity(b, (Math.random()-.5)*0.3);
+    Composite.add(engine.world, b); dyn.push(b);
+    return b;
+  }
+  function fill(n){ for(let i=0;i<n;i++) spawn(40 + Math.random()*(W-80), -40 - Math.random()*260); }
+  fill(18);
+
+  // mouse drag
+  const mouse = Mouse.create(render.canvas);
+  const mc = MouseConstraint.create(engine, { mouse, constraint:{ stiffness:.2, render:{ visible:false } } });
+  Composite.add(engine.world, mc);
+  render.mouse = mouse;
+
+  // ---------- audio: plink on impact ----------
+  let actx, soundOn=true, lastPlink=0;
+  const ensure=()=>{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); };
+  function plink(vol, size){ if(!soundOn) return; ensure(); const t=actx.currentTime;
+    const o=actx.createOscillator(), g=actx.createGain(); o.type='triangle';
+    o.frequency.value = 520*Math.pow(2, (24-size)/26);   // bigger candy → lower note
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(Math.min(0.26,vol),t+0.004); g.gain.exponentialRampToValueAtTime(0.0001,t+0.2);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+0.22);
+  }
+  Events.on(engine, 'collisionStart', ev => {
+    const now = performance.now();
+    for (const p of ev.pairs){
+      const rel = Vector.magnitude(Vector.sub(p.bodyA.velocity, p.bodyB.velocity));
+      if (rel > 2.4 && now-lastPlink > 16){ lastPlink=now; const size = p.bodyA.circleRadius || 22; plink(Math.min(0.26, rel*0.03), size); if(navigator.vibrate) navigator.vibrate(3); }
+    }
+  });
+  const soundBtn=document.getElementById('sound');
+  soundBtn.addEventListener('click', ()=>{ soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if(soundOn){ ensure(); plink(0.2,20); } });
+
+  // ---------- controls ----------
+  document.getElementById('drop').addEventListener('click', ()=>{ ensure(); spawn(40 + Math.random()*(W-80), -30); });
+  document.getElementById('shake').addEventListener('click', ()=>{ ensure(); for(const b of dyn){ Body.setVelocity(b, { x:(Math.random()-.5)*18, y:-6-Math.random()*12 }); Body.setAngularVelocity(b, (Math.random()-.5)*0.6); } });
+  document.getElementById('reset').addEventListener('click', ()=>{ Composite.remove(engine.world, dyn); dyn.length=0; fill(18); });
+  jar.addEventListener('pointerdown', ()=>ensure(), { once:true });
+
+  // ---------- responsive ----------
+  function fit(){
+    W=jar.clientWidth; H=jar.clientHeight; if(W<1) return;
+    render.options.width=W; render.options.height=H;
+    render.canvas.width = W*render.options.pixelRatio; render.canvas.height = H*render.options.pixelRatio;
+    render.canvas.style.width=W+'px'; render.canvas.style.height=H+'px';
+    render.bounds.max.x=W; render.bounds.max.y=H;
+    buildWalls();
+  }
+  addEventListener('resize', fit);
+
+  // debug: step + draw without rAF for headless screenshots
+  window.__settle = (n=180) => { for(let i=0;i<n;i++) Engine.update(engine, 1000/60); Render.world(render); };
+</script>
+</body>
+</html>

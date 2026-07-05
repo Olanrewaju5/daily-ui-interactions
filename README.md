@@ -8,6 +8,7 @@ A daily practice of unique UI interactions, micro-interactions, and animation �
 
 | Day | Build | Highlights | Tech |
 |-----|-------|-----------|------|
+| 14 | [Candy Jar — Physics](./daily-builds/2026-06-24-physics-jar/) | Tactile Matter.js sandbox — colorful shapes fall and pile, drag to fling, shake to jumble, drop more; collision plinks scaled to impact | Matter.js rigid-body physics |
 | 13 | [Raymarched Metaball](./daily-builds/2026-06-24-raymarch-blob/) | 3D from pure shader math — metaball SDFs + smooth-min, raymarched with gradient normals for lighting, iridescent fresnel rim, cursor-reactive bulge + rotation | WebGL, GLSL raymarching, SDF |
 | 12 | [Holographic Achievement](./daily-builds/2026-06-24-holographic-achievement/) | myMind-style holographic card — drop-in bounce, cursor-tilt foil shimmer, then click to flip (rotateY) revealing a gold-medal award with a confetti burst | CSS 3D transforms, blend-mode foil, canvas confetti |
 | 11 | [Grow — Scroll Story](./daily-builds/2026-06-24-scrolltrigger-grow/) | Pinned scroll-driven story (GSAP ScrollTrigger) — plant grows seed→bloom across 4 beats, sky crossfades, stem draws, snap-to-beat + progress rail | GSAP ScrollTrigger (pin, scrub, snap) |
