@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#1a130c" />
+<title>Turntable — Day 15</title>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:radial-gradient(120% 100% at 50% 0%, #2a2018 0%, #171009 60%, #0e0a05 100%);
+    color:#f3ece1; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    display:grid; place-items:center; padding:22px; -webkit-font-smoothing:antialiased;
+  }
+  .wrap { display:flex; flex-direction:column; align-items:center; gap:18px; width:100%; max-width:620px; }
+  .brand { font-size:12px; letter-spacing:.34em; text-transform:uppercase; color:#a68a63; }
+
+  .deck {
+    position:relative; width:100%; aspect-ratio:14/9; border-radius:18px; overflow:hidden;
+    background:linear-gradient(180deg,#8a5a30 0%,#6e451f 62%,#5b3818 100%);
+    box-shadow:0 40px 80px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(0,0,0,.4), inset 0 2px 2px rgba(255,255,255,.18);
+  }
+  .deck::before { content:""; position:absolute; left:0; right:0; bottom:6%; height:5%; background:linear-gradient(180deg,#d9c7a6,#b39468); opacity:.5; }
+  .plate { position:absolute; left:3.5%; top:6%; width:64%; aspect-ratio:1; border-radius:50%;
+    background:radial-gradient(circle,#2a2a2c 0%,#161617 70%,#0c0c0d 100%); box-shadow:inset 0 0 20px rgba(0,0,0,.7), 0 6px 16px rgba(0,0,0,.5); }
+
+  .vinyl {
+    position:absolute; inset:4%; border-radius:50%;
+    background:
+      repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,0) 1px 4px),
+      radial-gradient(circle at 38% 32%, rgba(255,255,255,.10), rgba(255,255,255,0) 40%),
+      radial-gradient(circle,#141416 0%,#0a0a0b 100%);
+    box-shadow:inset 0 0 30px rgba(0,0,0,.8);
+    animation:spin 2.6s linear infinite; animation-play-state:paused;
+  }
+  .deck.playing .vinyl { animation-play-state:running; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .label {
+    position:absolute; left:50%; top:50%; width:38%; aspect-ratio:1; transform:translate(-50%,-50%); border-radius:50%;
+    display:grid; place-items:center; text-align:center; color:#fff; padding:6%;
+    box-shadow:0 0 0 3px rgba(0,0,0,.35), inset 0 0 12px rgba(0,0,0,.25);
+    background:var(--label,linear-gradient(140deg,#3a5a7a,#243447));
+  }
+  .label .lt { font-size:clamp(10px,2.2vw,15px); font-weight:800; letter-spacing:-.01em; line-height:1.1; }
+  .label .la { font-size:clamp(8px,1.6vw,11px); opacity:.85; margin-top:3px; }
+  .label .rpm { position:absolute; bottom:11%; font-size:8px; letter-spacing:.1em; opacity:.7; }
+  .spindle { position:absolute; left:50%; top:50%; width:3.5%; aspect-ratio:1; transform:translate(-50%,-50%); border-radius:50%; background:radial-gradient(circle,#eee,#999); z-index:3; }
+
+  /* tonearm */
+  .arm { position:absolute; top:9%; right:9%; width:44%; height:8%; transform-origin:right center; transform:rotate(-15deg);
+    transition:transform .8s cubic-bezier(.4,.9,.3,1); z-index:4; }
+  .deck.playing .arm, .deck.paused .arm { transform:rotate(12.5deg); }
+  .arm .tube { position:absolute; right:6%; top:38%; width:78%; height:22%; background:linear-gradient(180deg,#e8e8ea,#a8a8ac); border-radius:6px; box-shadow:0 2px 3px rgba(0,0,0,.4); }
+  .arm .pivot { position:absolute; right:-2%; top:-30%; width:20%; aspect-ratio:1; border-radius:50%; background:radial-gradient(circle at 40% 35%,#f0f0f2,#8a8a90); box-shadow:0 3px 6px rgba(0,0,0,.5); }
+  .arm .weight { position:absolute; right:-9%; top:6%; width:14%; aspect-ratio:1; border-radius:4px; background:linear-gradient(180deg,#3a3a3e,#1c1c1f); }
+  .arm .head { position:absolute; left:-3%; top:-6%; width:16%; height:130%; background:linear-gradient(180deg,#2a2a2e,#131315); border-radius:3px; box-shadow:0 3px 6px rgba(0,0,0,.5); }
+  .arm .head::after { content:""; position:absolute; left:40%; bottom:-22%; width:8%; height:26%; background:#d9d9dd; }
+
+  /* right console */
+  .console { position:absolute; right:5%; top:34%; width:24%; display:flex; flex-direction:column; gap:8%; align-items:center; }
+  .vu { width:100%; height:34px; border-radius:6px; background:#241a10; box-shadow:inset 0 0 8px rgba(0,0,0,.6); padding:5px; display:flex; align-items:flex-end; gap:3px; }
+  .vu i { flex:1; background:linear-gradient(180deg,#ffd27a,#ff7a3d); border-radius:2px; height:10%; transition:height .06s linear; opacity:.9; }
+  .now { font-size:10px; text-align:center; color:#f0e2cc; line-height:1.3; }
+  .now b { display:block; font-size:12px; }
+
+  .controls { display:flex; gap:12px; align-items:center; }
+  .tbtn { width:52px; height:52px; border-radius:50%; border:1px solid rgba(0,0,0,.4); cursor:pointer;
+    background:linear-gradient(180deg,#f4ece0,#d8c7ac); color:#3a2a16; font-size:17px; display:grid; place-items:center;
+    box-shadow:0 4px 0 #b49a74, 0 6px 12px rgba(0,0,0,.4); transition:transform .07s ease, box-shadow .07s ease; }
+  .tbtn:active { transform:translateY(3px); box-shadow:0 1px 0 #b49a74, 0 3px 6px rgba(0,0,0,.4); }
+  .tbtn.play { width:64px; height:64px; font-size:22px; background:linear-gradient(180deg,#ffe3a3,#e9a94e); box-shadow:0 4px 0 #b07d2f, 0 6px 14px rgba(0,0,0,.45); }
+  .spotify { display:inline-flex; align-items:center; gap:8px; text-decoration:none; background:#1db954; color:#08160c; font-weight:700; font-size:13px; padding:9px 16px; border-radius:999px; }
+  .spotify:hover { filter:brightness(1.06); }
+  .caption { font-size:12px; color:#8a7355; }
+  .sound { position:fixed; bottom:16px; right:18px; background:none; border:0; cursor:pointer; color:#7a6647; font-size:12px; padding:8px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">Allagi &middot; Hi-Fi</div>
+    <div class="deck" id="deck">
+      <div class="plate">
+        <div class="vinyl" id="vinyl">
+          <div class="label" id="label">
+            <div>
+              <div class="lt" id="lt">So Long</div>
+              <div class="la">Allagi</div>
+            </div>
+            <div class="rpm">33 &frac13; RPM</div>
+          </div>
+        </div>
+        <div class="spindle"></div>
+      </div>
+      <div class="arm"><div class="pivot"></div><div class="weight"></div><div class="tube"></div><div class="head"></div></div>
+      <div class="console">
+        <div class="vu" id="vu"></div>
+        <div class="now"><b id="nowTitle">So Long</b><span id="nowArtist">Allagi</span></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="tbtn" id="prev" aria-label="Previous">&#9198;</button>
+      <button class="tbtn play" id="play" aria-label="Play">&#9654;</button>
+      <button class="tbtn" id="stop" aria-label="Stop">&#9632;</button>
+      <button class="tbtn" id="next" aria-label="Next">&#9197;</button>
+    </div>
+    <a class="spotify" id="spotify" href="#" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="#08160c"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.6 14.4a.62.62 0 01-.86.21c-2.35-1.44-5.3-1.76-8.79-.96a.62.62 0 11-.28-1.21c3.8-.87 7.07-.5 9.72 1.11a.62.62 0 01.21.85zm1.23-2.74a.78.78 0 01-1.07.26c-2.69-1.65-6.79-2.13-9.97-1.17a.78.78 0 11-.45-1.49c3.63-1.1 8.15-.56 11.24 1.33a.78.78 0 01.25 1.07zm.11-2.85C14.83 8.98 9.4 8.8 6.3 9.74a.93.93 0 11-.54-1.78c3.56-1.08 9.56-.87 13.33 1.37a.93.93 0 01-.95 1.6z"/></svg>
+      Open in Spotify
+    </a>
+    <div class="caption">A warm generative lo-fi loop with vinyl crackle — play, pause, stop, skip</div>
+  </div>
+  <button class="sound on" id="sound" aria-label="Toggle sound">♪ sound</button>
+
+<script>
+  const deck=document.getElementById('deck'), playBtn=document.getElementById('play');
+  const TRACKS = [
+    { t:'So Long',   root:220.00, label:'linear-gradient(140deg,#3a5a7a,#20303f)', chords:[[0,3,7],[0,3,10],[-2,3,7],[-4,3,8]] },
+    { t:'Halcyon',   root:196.00, label:'linear-gradient(140deg,#c77d54,#7a3f4a)', chords:[[0,4,7],[0,4,9],[-3,4,7],[2,5,9]] },
+    { t:'Slow Light',root:246.94, label:'linear-gradient(140deg,#3f8f7a,#245a55)', chords:[[0,3,7],[2,5,10],[-2,3,7],[0,5,8]] },
+    { t:'Afterglow', root:174.61, label:'linear-gradient(140deg,#6a4b8a,#a05a3a)', chords:[[0,4,9],[-3,4,7],[0,5,9],[2,4,7]] },
+  ];
+  let idx=0, state='stopped', chordI=0, sched=null;
+  const nf=(root,semi)=>root*Math.pow(2,semi/12);
+
+  // ---------- audio graph ----------
+  let ctx, master, analyser, pad=[], padFilter, bass, crackleGain, started=false, soundOn=true, data;
+  function build(){
+    ctx=new (window.AudioContext||window.webkitAudioContext)();
+    master=ctx.createGain(); master.gain.value=0;
+    analyser=ctx.createAnalyser(); analyser.fftSize=256; data=new Uint8Array(analyser.frequencyBinCount);
+    master.connect(analyser); analyser.connect(ctx.destination);
+    padFilter=ctx.createBiquadFilter(); padFilter.type='lowpass'; padFilter.frequency.value=760; padFilter.Q.value=6;
+    const padGain=ctx.createGain(); padGain.gain.value=0.16; padFilter.connect(padGain); padGain.connect(master);
+    for(let i=0;i<3;i++){ const o=ctx.createOscillator(); o.type=i===0?'triangle':'sine'; o.frequency.value=220; o.connect(padFilter); o.start(); pad.push(o); }
+    // filter movement
+    const lfo=ctx.createOscillator(), lg=ctx.createGain(); lfo.frequency.value=0.08; lg.gain.value=260; lfo.connect(lg); lg.connect(padFilter.frequency); lfo.start();
+    // bass
+    bass=ctx.createOscillator(); bass.type='sine'; const bg=ctx.createGain(); bg.gain.value=0.16; bass.frequency.value=110; bass.connect(bg); bg.connect(master); bass.start();
+    // vinyl crackle
+    const len=ctx.sampleRate*3, buf=ctx.createBuffer(1,len,ctx.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++){ d[i]=(Math.random()*2-1)*0.06; if(Math.random()<0.0009) d[i]+=(Math.random()*2-1)*0.8; }
+    const src=ctx.createBufferSource(); src.buffer=buf; src.loop=true;
+    const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1200;
+    crackleGain=ctx.createGain(); crackleGain.gain.value=0.5; src.connect(hp); hp.connect(crackleGain); crackleGain.connect(master); src.start();
+    started=true;
+  }
+  function setChord(){ const tr=TRACKS[idx], ch=tr.chords[chordI%tr.chords.length]; const t=ctx.currentTime;
+    pad.forEach((o,i)=>o.frequency.setTargetAtTime(nf(tr.root,ch[i]||0), t, 0.25));
+    bass.frequency.setTargetAtTime(nf(tr.root,(ch[0]||0))/2, t, 0.25);
+  }
+  function gain(v){ if(master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.25); }
+  function startSched(){ setChord(); clearInterval(sched); sched=setInterval(()=>{ chordI++; setChord(); }, 3800); }
+
+  // ---------- UI / transport ----------
+  function loadTrack(){ const tr=TRACKS[idx];
+    document.getElementById('lt').textContent=tr.t; document.getElementById('nowTitle').textContent=tr.t;
+    document.getElementById('label').style.setProperty('--label', tr.label);
+    document.getElementById('spotify').href='https://open.spotify.com/search/'+encodeURIComponent('Allagi '+tr.t);
+    if(started) setChord();
+  }
+  function setState(s){ state=s; deck.classList.toggle('playing', s==='playing'); deck.classList.toggle('paused', s==='paused');
+    playBtn.innerHTML = s==='playing' ? '&#10074;&#10074;' : '&#9654;'; }
+  function ensure(){ if(!started) build(); if(ctx.state==='suspended') ctx.resume(); }
+  function play(){ ensure(); if(!soundOn) gain(0); else gain(0.85); startSched(); setState('playing'); }
+  function pause(){ if(state!=='playing') return; gain(0); clearInterval(sched); setState('paused'); }
+  function stop(){ gain(0); clearInterval(sched); chordI=0; setState('stopped'); }
+  function next(d){ idx=(idx+d+TRACKS.length)%TRACKS.length; chordI=0; loadTrack(); if(state==='playing'){ startSched(); } }
+
+  playBtn.addEventListener('click', ()=>{ if(state==='playing') pause(); else play(); });
+  document.getElementById('stop').addEventListener('click', stop);
+  document.getElementById('next').addEventListener('click', ()=>next(1));
+  document.getElementById('prev').addEventListener('click', ()=>next(-1));
+  const soundBtn=document.getElementById('sound');
+  soundBtn.addEventListener('click', ()=>{ soundOn=!soundOn; soundBtn.classList.toggle('on',soundOn); if(state==='playing') gain(soundOn?0.85:0); });
+
+  // VU meter
+  const vu=document.getElementById('vu'); for(let i=0;i<10;i++){ vu.appendChild(document.createElement('i')); }
+  const bars=[...vu.children];
+  function frame(){ let level=0; if(analyser){ analyser.getByteTimeDomainData(data); let s=0; for(let i=0;i<data.length;i++){ const v=(data[i]-128)/128; s+=v*v; } level=Math.sqrt(s/data.length); }
+    bars.forEach((b,i)=>{ const target=Math.min(1, level*4* (0.5+Math.random()*0.9)) ; b.style.height=(8+target*90*(1-i*0.02))+'%'; });
+    requestAnimationFrame(frame); }
+  requestAnimationFrame(frame);
+
+  loadTrack();
+  window.__play=play; window.__next=()=>next(1);
+</script>
+</body>
+</html>
