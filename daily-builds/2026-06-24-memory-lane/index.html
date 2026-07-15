@@ -6,20 +6,19 @@
 <meta name="theme-color" content="#d8d5cd" />
 <title>Memory Lane — Timeline Slider · Day 16</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Newsreader:ital,opsz,wght@0,6..72,300..500;1,6..72,300..400&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@200;300;400;500;600;700&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
 <style>
   * { box-sizing:border-box; }
   html, body { height:100%; margin:0; }
   body {
-    background:#d8d5cd; color:#211f1c;
-    font-family:"Newsreader",Georgia,serif;
-    display:grid; place-items:center; padding:20px; -webkit-font-smoothing:antialiased;
+    background:#f1efea; color:#211f1c;
+    font-family:"Sora",system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
   }
 
   .app {
-    position:relative; width:min(1180px,96vw); aspect-ratio:16/10; min-height:480px;
-    background:#f1efea; border-radius:22px; overflow:hidden;
-    box-shadow:0 50px 90px -40px rgba(40,35,25,.55), 0 0 0 1px rgba(0,0,0,.05);
+    position:relative; width:100vw; height:100vh; height:100dvh;
+    background:#f1efea; overflow:hidden;
     display:flex; flex-direction:column;
   }
 
@@ -38,14 +37,15 @@
   .track { position:absolute; inset:0; display:flex; align-items:center; will-change:transform; }
   .slide { flex:0 0 var(--sw,86%); height:100%; display:grid; grid-template-columns:40% 60%; align-items:center; padding:0 clamp(18px,3vw,44px); gap:2%; will-change:transform,opacity; }
 
-  .copy h2 { font-family:"Instrument Serif",serif; font-weight:400; font-size:clamp(24px,3.1vw,40px); line-height:1.05; margin:0 0 .18em; letter-spacing:-.01em; }
-  .copy p { font-size:clamp(15px,1.85vw,25px); line-height:1.35; color:#5d574e; margin:0; font-weight:300; max-width:14em; }
+  .copy h2 { font-weight:600; font-size:clamp(23px,2.7vw,38px); line-height:1.12; margin:0 0 .34em; letter-spacing:-.035em; }
+  .copy p { font-size:clamp(14px,1.35vw,19px); line-height:1.55; color:#635d54; margin:0; font-weight:300; letter-spacing:-.012em; max-width:17em; }
 
   .cluster { position:relative; height:78%; --px:0; --py:0; }
-  .ph { position:absolute; background:#fff; padding:3.2% 3.2% 4.6%; border-radius:7px;
-    box-shadow:0 22px 44px -14px rgba(35,28,18,.42), 0 2px 6px rgba(0,0,0,.10);
+  .ph { position:absolute; background:linear-gradient(180deg,#fff 0%,#fbfaf7 100%); padding:clamp(4px,.42vw,7px); border-radius:11px;
+    box-shadow:0 20px 40px -14px rgba(35,28,18,.36), 0 3px 8px rgba(35,28,18,.10), 0 0 0 1px rgba(35,28,18,.055);
     transition:transform .3s cubic-bezier(.2,.8,.3,1); }
-  .ph img { display:block; width:100%; height:100%; object-fit:cover; border-radius:2px; background:linear-gradient(160deg,#c9c2b6,#8f8a7e); }
+  .ph img { display:block; width:100%; height:100%; object-fit:cover; border-radius:7px; background:linear-gradient(160deg,#c9c2b6,#8f8a7e);
+    box-shadow:0 0 0 1px rgba(35,28,18,.07) inset; }
   .ph.a { width:44%; aspect-ratio:4/3; left:-1%;  top:30%; --d:14px; transform:translate(calc(var(--px)*var(--d)),calc(var(--py)*var(--d))) rotate(-5deg); z-index:1; }
   .ph.b { width:33%; aspect-ratio:3/4; left:36%; top:4%;  --d:26px; transform:translate(calc(var(--px)*var(--d)),calc(var(--py)*var(--d))) rotate(1.5deg); z-index:3; }
   .ph.c { width:35%; aspect-ratio:3/4; left:61%; top:17%; --d:20px; transform:translate(calc(var(--px)*var(--d)),calc(var(--py)*var(--d))) rotate(8.5deg); z-index:2; }
@@ -61,8 +61,8 @@
   /* caption + filmstrip */
   .foot { flex:none; padding:0 0 22px; text-align:center; z-index:5; }
   .cap { transition:opacity .22s ease; }
-  .cap .t { font-family:"Instrument Serif",serif; font-size:17px; }
-  .cap .p { font-family:"Newsreader",serif; font-style:italic; font-size:15px; color:#4d473f; margin-top:1px; }
+  .cap .t { font-size:14px; font-weight:600; letter-spacing:-.02em; }
+  .cap .p { font-size:12.5px; font-weight:300; color:#7d766b; margin-top:2px; letter-spacing:.06em; }
   .tick { width:1px; height:11px; background:#3a352d; margin:7px auto 9px; opacity:.6; }
   .strip { position:relative; width:min(430px,68%); margin:0 auto; height:56px; overflow:hidden; cursor:grab; touch-action:pan-y;
     -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 13%,#000 87%,transparent 100%);
@@ -78,7 +78,6 @@
   .hint { position:absolute; left:50%; bottom:8px; transform:translateX(-50%); font-size:11px; color:#9b9488; letter-spacing:.08em; z-index:5; }
 
   @media (max-width:760px){
-    .app { aspect-ratio:auto; height:min(88vh,720px); }
     .slide { grid-template-columns:1fr; grid-template-rows:auto 1fr; gap:6px; align-content:center; }
     .copy p { max-width:none; }
     .cluster { height:56%; }
@@ -160,16 +159,19 @@
   const clamp=(n,a,b)=>Math.min(Math.max(n,a),b);
 
   // drag on the photo area
-  let sx=0, si=0, lastX=0, lastT=0, vx=0, source=null;
-  function down(e, src, unit){ dragging=true; source={src,unit}; sx=e.clientX; si=index; vel=0; vx=0; lastX=e.clientX; lastT=performance.now();
+  let sx=0, si=0, lastX=0, lastT=0, vx=0, source=null, moved=false;
+  function down(e, src, unit){ dragging=true; moved=false; source={src,unit}; sx=e.clientX; si=index; vel=0; vx=0; lastX=e.clientX; lastT=performance.now();
     (src===viewport?viewport:strip).classList.add('grabbing'); src.setPointerCapture?.(e.pointerId); }
   function move(e){ if(!dragging) return; const now=performance.now(), dt=(now-lastT)/1000;
+    if(Math.abs(e.clientX-sx)>4) moved=true;
     if(dt>0){ vx=(e.clientX-lastX)/dt; lastX=e.clientX; lastT=now; }
-    index = clamp(si - (e.clientX-sx)/source.unit, -0.6, MEM.length-0.4);
+    if(moved) index = clamp(si - (e.clientX-sx)/source.unit, -0.6, MEM.length-0.4);
   }
   function up(){ if(!dragging) return; dragging=false;
     viewport.classList.remove('grabbing'); strip.classList.remove('grabbing');
-    const projected = index - (vx/source.unit)*0.28;
+    // a tap (no drag) leaves the target alone so a thumbnail click can own it
+    if(!moved){ source=null; return; }
+    const projected = index - (vx/source.unit)*0.26;
     target = clamp(Math.round(projected), 0, MEM.length-1); source=null;
   }
   viewport.addEventListener('pointerdown', e=>{ e.preventDefault(); down(e, viewport, step); });
@@ -197,20 +199,20 @@
   // ---------- loop ----------
   function frame(now){
     const dt=Math.min(last?(now-last)/1000:1/60, 1/30); last=now;
-    if(!dragging){ const f=-150*(index-target)-24*vel; vel+=f*dt; index+=vel*dt; }
+    if(!dragging){ const f=-105*(index-target)-21*vel; vel+=f*dt; index+=vel*dt; }   // smooth, no overshoot
     track.style.transform=`translate3d(${(offset - index*step).toFixed(2)}px,0,0)`;
 
     const cur=clamp(Math.round(index),0,MEM.length-1); setCap(cur);
     slides.forEach((s,i)=>{ const d=Math.abs(i-index);
-      s.style.opacity = (1 - Math.min(1,d)*0.72).toFixed(3);
-      s.style.transform = `scale(${(1 - Math.min(1,d)*0.05).toFixed(4)})`;
+      s.style.opacity = (1 - Math.min(1,d)*0.74).toFixed(3);
+      s.style.transform = `scale(${(1 - Math.min(1,d)*0.035).toFixed(4)})`;
       s.classList.toggle('active', i===cur && d<0.35);
     });
     striptrack.style.transform=`translate3d(${(tOffset - index*tStep).toFixed(2)}px,0,0)`;
     thumbs.forEach((t,i)=>{ const d=Math.abs(i-index);
-      const sc = 1 + Math.max(0,1-d*0.85)*0.62;
-      t.style.transform=`scale(${sc.toFixed(3)}) translateY(${(-Math.max(0,1-d*0.85)*3).toFixed(2)}px)`;
-      t.style.opacity=clamp(1-d*0.24,0.28,1).toFixed(3);
+      const rise = Math.max(0,1-d*0.8);
+      t.style.transform=`scale(${(1+rise*0.42).toFixed(3)}) translateY(${(-rise*2).toFixed(2)}px)`;
+      t.style.opacity=clamp(1-d*0.17,0.45,1).toFixed(3);
       t.style.zIndex=String(10-Math.round(d));
       t.classList.toggle('on', i===cur);
     });
