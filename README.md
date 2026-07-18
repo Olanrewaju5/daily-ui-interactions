@@ -8,6 +8,7 @@ A daily practice of unique UI interactions, micro-interactions, and animation �
 
 | Day | Build | Highlights | Tech |
 |-----|-------|-----------|------|
+| 17 | [Type Lens](./daily-builds/2026-07-18-type-lens/) | Kinetic variable-font type — cursor is a gravity lens giving letters mass via live `wght`/`wdth` axes, per-letter underdamped springs (inertia + overshoot), click shockwave rippling mass through the headline, idle breathing wave; synthesized thump + per-letter ticks | Variable font (Roboto Flex), spring physics, Web Audio |
 | 16 | [Memory Lane Timeline](./daily-builds/2026-06-24-memory-lane/) | Editorial photo-timeline slider — drag/fling slides, filmstrip scrubber that re-centres the active frame with dock falloff, peeking neighbours, photo parallax, self-drawing handwritten arrows | Vanilla spring physics, CSS 3D, SVG |
 | 15 | [Vintage Turntable](./daily-builds/2026-06-24-vinyl-player/) | Interactive record player — spinning vinyl, dropping tonearm, live VU meter; play/pause/stop/skip a generative lo-fi loop with vinyl crackle | Web Audio (generative), CSS turntable |
 | 14 | [Candy Jar — Physics](./daily-builds/2026-06-24-physics-jar/) | Tactile Matter.js sandbox — colorful shapes fall and pile, drag to fling, shake to jumble, drop more; collision plinks scaled to impact | Matter.js rigid-body physics |

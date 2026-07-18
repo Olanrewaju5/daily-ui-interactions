@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Type Lens — Day 17</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wdth,wght@8..144,25..151,100..1000&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #16130e;
+    --ink: #f2ede2;
+    --dim: #8a8274;
+    --accent: #ffb02e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(120% 90% at 50% 8%, #221d15 0%, var(--bg) 55%);
+    color: var(--ink);
+    font-family: "Roboto Flex", system-ui, sans-serif;
+    overflow: hidden;
+    cursor: none;
+    -webkit-user-select: none; user-select: none;
+    touch-action: none;
+  }
+  main {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(2px, 1vh, 10px);
+  }
+  .line {
+    font-size: clamp(30px, 14.5vw, 168px);
+    line-height: 0.98;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    font-variation-settings: "wght" 300, "wdth" 90, "opsz" 144;
+  }
+  .line span {
+    display: inline-block;
+    will-change: font-variation-settings, transform, color;
+    font-variation-settings: inherit;
+  }
+  .kicker, .hint {
+    font-size: clamp(11px, 1.4vw, 14px);
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--dim);
+    font-variation-settings: "wght" 450, "wdth" 100;
+  }
+  .kicker { margin-bottom: clamp(10px, 3vh, 28px); }
+  .hint { margin-top: clamp(12px, 3.5vh, 30px); transition: opacity 0.6s; }
+  .hint b { color: var(--accent); font-weight: inherit; }
+  #lens {
+    position: fixed;
+    left: 0; top: 0;
+    width: 56px; height: 56px;
+    margin: -28px 0 0 -28px;
+    border: 1.5px solid color-mix(in srgb, var(--accent) 65%, transparent);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+    box-shadow: 0 0 24px -6px color-mix(in srgb, var(--accent) 40%, transparent),
+                inset 0 0 18px -8px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  #lens::after {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 3px; height: 3px;
+    margin: -1.5px 0 0 -1.5px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  @media (hover: none) {
+    body { cursor: auto; }
+    #lens { display: none; }
+  }
+</style>
+</head>
+<body>
+<main id="stage">
+  <div class="kicker">Day 17 · Variable font, live axes</div>
+  <div class="line" data-text="SOME TYPE"></div>
+  <div class="line" data-text="CARRIES"></div>
+  <div class="line" data-text="GRAVITY"></div>
+  <div class="hint" id="hint">move the lens — <b>click</b> for a shockwave</div>
+</main>
+<div id="lens"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- split lines into letter spans ----------
+  const letters = []; // {el, x, y, w, wght, wv, wdth, dv, base}
+  document.querySelectorAll(".line").forEach(line => {
+    for (const ch of line.dataset.text) {
+      const s = document.createElement("span");
+      if (ch === " ") { s.innerHTML = "&nbsp;"; line.appendChild(s); continue; }
+      s.textContent = ch;
+      line.appendChild(s);
+      letters.push({ el: s, x: 0, y: 0, wght: 300, wv: 0, wdth: 90, dv: 0, heat: 0 });
+    }
+  });
+
+  const lensEl = document.getElementById("lens");
+  const hintEl = document.getElementById("hint");
+
+  // ---------- letter centers (cached; wdth changes shift them, so refresh cheaply) ----------
+  let centersDirty = true;
+  let centerTick = 0;
+  function measure() {
+    for (const L of letters) {
+      const r = L.el.getBoundingClientRect();
+      L.x = r.left + r.width / 2;
+      L.y = r.top + r.height / 2;
+    }
+  }
+  addEventListener("resize", () => { centersDirty = true; });
+
+  // ---------- pointer with its own spring (the lens lags the cursor) ----------
+  const ptr = { tx: innerWidth / 2, ty: innerHeight * 0.42, x: innerWidth / 2, y: innerHeight * 0.42, vx: 0, vy: 0, active: false };
+  let lastMove = performance.now();
+
+  function setPointer(x, y) {
+    ptr.tx = x; ptr.ty = y;
+    ptr.active = true;
+    lastMove = performance.now();
+  }
+  addEventListener("pointermove", e => setPointer(e.clientX, e.clientY));
+  addEventListener("pointerdown", e => { setPointer(e.clientX, e.clientY); pulse(e.clientX, e.clientY); });
+
+  // ---------- shockwave pulses ----------
+  const pulses = []; // {x, y, r, born}
+  const WAVE_SPEED = 1400;   // px/s
+  const WAVE_WIDTH = 130;    // px band
+  function pulse(x, y) {
+    pulses.push({ x, y, born: performance.now() });
+    thump();
+    hintEl.style.opacity = "0";
+  }
+
+  // ---------- audio (synthesized, gesture-gated) ----------
+  let actx = null;
+  function audio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (actx.state === "suspended") actx.resume();
+    return actx;
+  }
+  function thump() {
+    const ctx = audio(); if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(38, t + 0.28);
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.34);
+    o.connect(g).connect(ctx.destination);
+    o.start(t); o.stop(t + 0.36);
+  }
+  let lastTick = 0;
+  function tick(pitch) {
+    const ctx = actx; if (!ctx) return;
+    const now = performance.now();
+    if (now - lastTick < 34) return;
+    lastTick = now;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "triangle";
+    o.frequency.value = 620 + pitch * 900;
+    g.gain.setValueAtTime(0.028, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.05);
+    o.connect(g).connect(ctx.destination);
+    o.start(t); o.stop(t + 0.06);
+  }
+
+  // ---------- simulation ----------
+  const LENS_R = 240;        // influence radius, px
+  const W_MIN = 300, W_MAX = 980;
+  const D_MIN = 88, D_MAX = 132;
+  const STIFF = 130, DAMP = 15;      // letter weight spring (underdamped → overshoot)
+  const IDLE_AFTER = 3000;
+
+  function step(dt, now) {
+    // lens spring toward raw pointer
+    const k = 260, d = 26;
+    ptr.vx += (ptr.tx - ptr.x) * k * dt; ptr.vx *= Math.exp(-d * dt);
+    ptr.vy += (ptr.ty - ptr.y) * k * dt; ptr.vy *= Math.exp(-d * dt);
+    ptr.x += ptr.vx * dt; ptr.y += ptr.vy * dt;
+
+    const idle = now - lastMove > IDLE_AFTER;
+    const idleT = now / 1000;
+
+    // advance pulses, drop finished
+    for (let i = pulses.length - 1; i >= 0; i--) {
+      const age = (now - pulses[i].born) / 1000;
+      pulses[i].r = age * WAVE_SPEED;
+      if (pulses[i].r - WAVE_WIDTH > Math.hypot(innerWidth, innerHeight)) pulses.splice(i, 1);
+    }
+
+    for (let li = 0; li < letters.length; li++) {
+      const L = letters[li];
+
+      // lens influence: smooth falloff 1→0 over LENS_R
+      let f = 0;
+      if (ptr.active) {
+        const dist = Math.hypot(ptr.x - L.x, ptr.y - L.y);
+        const t = Math.min(dist / LENS_R, 1);
+        f = 1 - t * t * (3 - 2 * t); // smoothstep falloff
+      }
+
+      // idle breathing wave travels along letter index
+      if (idle) f = Math.max(f, 0.28 + 0.24 * Math.sin(idleT * 1.6 - li * 0.55));
+
+      // shockwave band adds mass as it sweeps past
+      let shock = 0;
+      for (const P of pulses) {
+        const dist = Math.hypot(P.x - L.x, P.y - L.y);
+        const band = 1 - Math.min(Math.abs(dist - P.r) / WAVE_WIDTH, 1);
+        if (band > shock) shock = band * band;
+      }
+      if (shock > 0.55 && L.heat < 0.4) tick(li / letters.length);
+      L.heat = shock;
+
+      const drive = Math.min(f + shock * 1.15, 1.35);
+      const targW = W_MIN + (W_MAX - W_MIN) * drive;
+      const targD = D_MIN + (D_MAX - D_MIN) * Math.min(drive, 1);
+
+      // underdamped spring on wght → inertia + overshoot
+      L.wv += (targW - L.wght) * STIFF * dt; L.wv *= Math.exp(-DAMP * dt);
+      L.wght += L.wv * dt;
+      L.dv += (targD - L.wdth) * STIFF * dt; L.dv *= Math.exp(-DAMP * dt);
+      L.wdth += L.dv * dt;
+    }
+  }
+
+  function render() {
+    for (const L of letters) {
+      const w = Math.max(100, Math.min(1000, L.wght));
+      const wd = Math.max(25, Math.min(151, L.wdth));
+      L.el.style.fontVariationSettings = `"wght" ${w.toFixed(1)}, "wdth" ${wd.toFixed(1)}, "opsz" 144`;
+      const glow = Math.max(0, (w - 600) / 400);
+      L.el.style.color = glow > 0.02
+        ? `color-mix(in srgb, var(--accent) ${(glow * 55).toFixed(1)}%, var(--ink))`
+        : "";
+      L.el.style.transform = `translateY(${(-glow * 4).toFixed(2)}px)`;
+    }
+    if (ptr.active) {
+      lensEl.style.opacity = "1";
+      lensEl.style.transform = `translate(${ptr.x.toFixed(1)}px, ${ptr.y.toFixed(1)}px)`;
+    }
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (centersDirty || ++centerTick % 12 === 0) { measure(); centersDirty = false; }
+    step(dt, now);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- debug hooks (deterministic screenshots) ----------
+  window.__setPointer = (x, y) => { setPointer(x, y); ptr.x = x; ptr.y = y; };
+  window.__pulse = (x, y) => pulse(x ?? innerWidth / 2, y ?? innerHeight / 2);
+  window.__settle = (n = 60) => {
+    const now = performance.now();
+    for (let i = 0; i < n; i++) step(1 / 60, now + i * (1000 / 60));
+    measure(); render();
+  };
+
+  let started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    measure();
+    requestAnimationFrame(frame);
+  }
+  document.fonts.ready.then(start);
+  setTimeout(start, 1500); // fonts.ready never rejects, but don't stay frozen if the CDN stalls
+})();
+</script>
+</body>
+</html>
