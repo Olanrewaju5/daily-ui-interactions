@@ -2,7 +2,8 @@
 .DS_Store
 
 # Editor / local agent config
-.claude/
+.claude/*
+!.claude/skills/
 .vscode/
 
 # Vercel
