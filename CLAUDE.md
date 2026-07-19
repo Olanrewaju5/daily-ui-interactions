@@ -18,12 +18,14 @@ A daily practice repo: one small, finishable UI interaction per day, focused on 
 ## Workflow skills (in `.claude/skills/`)
 
 - `/new-day` — scaffold today's build folder + stub, pick the day number
+- `/motion-taste` — taste pass: anti-slop checklist, numeric duration/easing/spring defaults, critique protocol, motion vocabulary for precise specs; consult when designing the motion AND before shipping
 - `/verify-interaction` — hard-won verification recipes (GSAP seek hooks, WebGL screenshot gotchas, debug hooks); use before calling a build done
 - `/publish-day` — gallery/README updates, commit, push, live-URL verification
 
 ## Quality bar
 
 Before calling a build done:
+- Run the `/motion-taste` critique protocol (delete test, A/B the hero motion's key value, tenth-time test, reduced-motion pass).
 - Run `/verify-interaction` and screenshot the key states.
 - No console errors; works at 375px (mobile) and 1280px (desktop) viewports.
 - Interactions should hold ~60fps; prefer transform/opacity animation, avoid layout thrash in rAF loops.

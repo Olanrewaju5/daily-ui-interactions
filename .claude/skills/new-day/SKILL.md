@@ -15,9 +15,10 @@ Set up today's build so the session starts at the fun part.
 4. **Create the folder**: `daily-builds/<YYYY-MM-DD>-<slug>/` using **today's real date** (not the repo's start date — old folders are wrong, don't copy them).
 5. **Stub `index.html`**: self-contained, viewport meta, dark-friendly background, a `<main>` stage, and an empty `<script>` block. CDN tags only if the chosen library needs them.
 6. **State the plan in one paragraph**: the core interaction, the motion beats (entrance → interaction → reward/idle), and what "feels great" means for this one — then build.
+7. **Spec the motion in `/motion-taste` vocabulary** before writing code: name the hero motion, its regime (expressive vs product-UI), and rough numbers (durations, easing, spring character, stagger). One sentence per animated element.
 
 ## During the build
 
 - Add deterministic debug hooks as you go (`window.__seek(p)`, `window.__setState(...)`) — `/verify-interaction` depends on them.
 - Synthesize sound with Web Audio; never ship audio files.
-- Finish with `/verify-interaction`, then `/publish-day`.
+- Finish with the `/motion-taste` critique protocol, then `/verify-interaction`, then `/publish-day`.
