@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Toast Choreography — Day 18</title>
+<style>
+  :root {
+    --bg: #101214;
+    --panel: #17191c;
+    --card: #1d2024;
+    --edge: #2a2e33;
+    --ink: #e9ecef;
+    --dim: #9aa1a9;
+    --ok: #4ade80;
+    --err: #f87171;
+    --accent: #7dd3fc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+  }
+  main {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+  }
+  .kicker {
+    font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 6px;
+  }
+  h1 { font-size: clamp(22px, 4vw, 34px); font-weight: 650; letter-spacing: -0.02em; }
+  .sub { color: var(--dim); font-size: 14px; margin-bottom: 22px; max-width: 42ch; text-align: center; line-height: 1.5; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  button {
+    font: inherit; font-size: 14px; font-weight: 550;
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: transform 0.08s ease-out, background 0.15s ease-out, border-color 0.15s ease-out;
+  }
+  button:hover { background: #23272c; border-color: #3a4048; }
+  button:active { transform: scale(0.97); }
+  button.ok { color: var(--ok); }
+  button.err { color: var(--err); }
+  button.load { color: var(--accent); }
+
+  /* variant switch (the A/B judgement rep) */
+  .ab {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 999px; padding: 5px 6px 5px 14px;
+    font-size: 12px; color: var(--dim); z-index: 50;
+  }
+  .ab .opts { display: flex; gap: 2px; }
+  .ab button {
+    padding: 4px 12px; border-radius: 999px; border: none; background: transparent;
+    font-size: 12px; color: var(--dim);
+  }
+  .ab button.on { background: var(--card); color: var(--ink); border: 1px solid var(--edge); }
+
+  /* toast stack */
+  #stack {
+    position: fixed;
+    right: 20px; bottom: 20px;
+    width: 340px;
+    max-width: calc(100vw - 32px);
+    z-index: 40;
+  }
+  .toast {
+    position: absolute;
+    right: 0; bottom: 0;
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--edge);
+    border-radius: 12px;
+    padding: 13px 15px;
+    display: flex; gap: 11px; align-items: flex-start;
+    box-shadow: 0 8px 28px -10px rgba(0,0,0,0.55);
+    cursor: grab;
+    touch-action: none;
+    will-change: transform, opacity;
+    transform-origin: 50% 100%; /* scale from the bottom edge so collapsed peeks stay tight */
+  }
+  .toast:active { cursor: grabbing; }
+  .toast .ic {
+    flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px;
+    display: grid; place-items: center;
+  }
+  .toast .ic, .toast .tx { transition: opacity 0.15s ease-out; }
+  .toast.veiled .ic, .toast.veiled .tx { opacity: 0; } /* collapsed back-cards: clean edge, no content */
+  .toast .ic svg { width: 18px; height: 18px; display: block; }
+  .toast .tx { min-width: 0; }
+  .toast .ti { font-size: 13.5px; font-weight: 600; line-height: 1.35; transition: opacity 0.15s ease-out; }
+  .toast .de { font-size: 12.5px; color: var(--dim); line-height: 1.4; margin-top: 1px; transition: opacity 0.15s ease-out; }
+  .spin { animation: rot 0.9s linear infinite; transform-origin: center; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  @media (max-width: 480px) {
+    #stack { right: 16px; bottom: 16px; }
+    .sub { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">Day 18 · Product-UI regime</div>
+  <h1>Toast Choreography</h1>
+  <p class="sub">A notification stack that stays polite under abuse: interruptible springs, swipe-to-dismiss with momentum, hover to fan out. Try the spam button.</p>
+  <div class="row">
+    <button class="ok" data-t="success">Save file</button>
+    <button class="err" data-t="error">Delete failed</button>
+    <button class="load" data-t="promise">Upload photo</button>
+    <button data-t="spam">Spam ×5</button>
+  </div>
+</main>
+
+<div class="ab" id="ab">
+  hero spring
+  <div class="opts">
+    <button data-v="a" class="on">A · snappy</button>
+    <button data-v="b">B · playful</button>
+  </div>
+</div>
+
+<div id="stack" aria-live="polite"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- spring variants (the A/B) ----------
+  const VARIANTS = {
+    a: { k: 550, d: 40 },  // snappy, no overshoot
+    b: { k: 300, d: 21 },  // playful, one overshoot
+  };
+  let variant = "a";
+
+  const abEl = document.getElementById("ab");
+  abEl.addEventListener("click", e => {
+    const b = e.target.closest("[data-v]");
+    if (!b) return;
+    variant = b.dataset.v;
+    abEl.querySelectorAll("[data-v]").forEach(x => x.classList.toggle("on", x === b));
+    spawn("success", "Variant " + variant.toUpperCase(), variant === "a" ? "Snappy — settles fast, no bounce." : "Playful — one overshoot, more life.");
+  });
+
+  // ---------- audio (synthesized, minimal) ----------
+  let actx = null;
+  const audio = () => {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (actx.state === "suspended") actx.resume();
+    return actx;
+  };
+  function blip(freq, dur, vol, type) {
+    const ctx = audio(); if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    o.connect(g).connect(ctx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  let lastEnterS = 0;
+  const sEnter = () => {
+    const n = performance.now();
+    if (n - lastEnterS < 150) return; // rapid bursts: one tick, not a drumroll
+    lastEnterS = n;
+    blip(760, 0.07, 0.05);
+  };
+  const sError = () => blip(150, 0.12, 0.07, "square");
+
+  // ---------- springs ----------
+  function mkSpring(v) { return { v, t: v, vel: 0 }; }
+  function stepSpring(s, k, d, dt) {
+    s.vel += (s.t - s.v) * k * dt;
+    s.vel *= Math.exp(-d * dt);
+    s.v += s.vel * dt;
+  }
+  const settled = s => Math.abs(s.v - s.t) < 0.05 && Math.abs(s.vel) < 0.05;
+
+  // ---------- toast model ----------
+  const stack = document.getElementById("stack");
+  const toasts = []; // newest first; {el, y, s, o, x, h, shake, dragging, dead, timer, ...}
+  let expanded = false;
+  let idc = 0;
+
+  const ICONS = {
+    success: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8.2" stroke="#4ade80" stroke-width="1.6"/><path d="M6.6 10.4l2.2 2.2 4.4-4.8" stroke="#4ade80" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    error: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8.2" stroke="#f87171" stroke-width="1.6"/><path d="M7.3 7.3l5.4 5.4M12.7 7.3l-5.4 5.4" stroke="#f87171" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    spinner: '<svg viewBox="0 0 20 20" fill="none" class="spin"><circle cx="10" cy="10" r="8.2" stroke="#2a2e33" stroke-width="1.6"/><path d="M10 1.8a8.2 8.2 0 0 1 8.2 8.2" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  };
+
+  function spawn(kind, title, desc) {
+    const el = document.createElement("div");
+    el.className = "toast";
+    el.innerHTML = '<div class="ic">' + (ICONS[kind === "promise" ? "spinner" : kind] || ICONS.success) + '</div>'
+      + '<div class="tx"><div class="ti"></div><div class="de"></div></div>';
+    el.querySelector(".ti").textContent = title;
+    el.querySelector(".de").textContent = desc;
+    stack.appendChild(el);
+
+    const T = {
+      id: ++idc, el, kind,
+      y: mkSpring(24), s: mkSpring(REDUCED ? 1 : 0.97), o: mkSpring(0), x: mkSpring(0),
+      h: el.offsetHeight,
+      shakeT: -1, dragging: false, dead: false, born: performance.now(),
+      timer: null,
+    };
+    T.o.t = 1; T.y.t = 0; T.s.t = 1;
+    if (REDUCED) { T.y.v = 0; T.s.v = 1; }
+    toasts.unshift(T);
+    attachDrag(T);
+
+    if (kind === "error") { T.shakeT = 0; sError(); } else sEnter();
+    if (kind === "promise") {
+      setTimeout(() => {
+        if (T.dead) return;
+        const ti = el.querySelector(".ti"), de = el.querySelector(".de"), ic = el.querySelector(".ic");
+        ti.style.opacity = de.style.opacity = "0";
+        setTimeout(() => {
+          ic.innerHTML = ICONS.success;
+          ti.textContent = "Photo uploaded"; de.textContent = "2.4 MB · added to library";
+          ti.style.opacity = de.style.opacity = "1";
+          armTimer(T);
+        }, 150);
+      }, 1800);
+    } else {
+      armTimer(T);
+    }
+    // cap the pile
+    if (toasts.length > 6) dismiss(toasts[toasts.length - 1], 0);
+    layout();
+    wake();
+    return T;
+  }
+
+  function armTimer(T) {
+    clearTimeout(T.timer);
+    T.timer = setTimeout(() => dismiss(T, 0), 4000);
+  }
+  function pauseTimers() { for (const T of toasts) clearTimeout(T.timer); }
+  function resumeTimers() { for (const T of toasts) if (!T.dead && T.kind !== "promise") armTimer(T); }
+
+  function dismiss(T, vx) {
+    if (T.dead) return;
+    T.dead = true;
+    clearTimeout(T.timer);
+    T.o.t = 0;
+    if (vx) { T.x.vel = vx; T.x.t = Math.sign(vx) * 500; } // momentum fling
+    else T.y.t = T.y.v + 12; // quiet exit: slight slide down + fade
+    layout();
+    wake();
+  }
+
+  // ---------- layout targets ----------
+  function layout() {
+    const live = toasts.filter(t => !t.dead);
+    let yAcc = 0;
+    live.forEach((T, i) => {
+      T.h = T.el.offsetHeight || T.h;
+      if (expanded) {
+        T.y.t = -yAcc; yAcc += T.h + 8;
+        T.s.t = 1;
+        T.o.t = 1;
+      } else {
+        T.y.t = -i * 13;
+        T.s.t = Math.max(1 - i * 0.05, 0.8);
+        T.o.t = i < 3 ? 1 : 0;
+      }
+      T.el.style.zIndex = 100 - i;
+      T.el.classList.toggle("veiled", !expanded && i > 0);
+      if (REDUCED) { T.y.v = T.y.t; T.s.v = T.s.t; }
+    });
+  }
+
+  stack.addEventListener("pointerenter", () => { expanded = true; pauseTimers(); layout(); wake(); });
+  stack.addEventListener("pointerleave", () => { expanded = false; resumeTimers(); layout(); wake(); });
+
+  // ---------- drag / swipe to dismiss ----------
+  function attachDrag(T) {
+    let px = 0, vx = 0, lastT = 0;
+    T.el.addEventListener("pointerdown", e => {
+      if (T.dead) return;
+      T.dragging = true;
+      T.el.setPointerCapture(e.pointerId);
+      px = e.clientX; vx = 0; lastT = performance.now();
+      wake();
+    });
+    T.el.addEventListener("pointermove", e => {
+      if (!T.dragging) return;
+      const now = performance.now();
+      const dx = e.clientX - px;
+      px = e.clientX;
+      const dt = Math.max((now - lastT) / 1000, 0.001);
+      lastT = now;
+      vx = 0.8 * vx + 0.2 * (dx / dt);
+      let nx = T.x.v + dx;
+      if (nx < 0) nx = T.x.v + dx * 0.35; // rubber-band the wrong way
+      T.x.v = nx; T.x.t = nx;
+    });
+    const up = e => {
+      if (!T.dragging) return;
+      T.dragging = false;
+      if (T.x.v > 80 || vx > 500) dismiss(T, Math.max(vx, 600));
+      else { T.x.t = 0; T.x.vel = vx * 0.3; } // spring home with residual velocity
+      wake();
+    };
+    T.el.addEventListener("pointerup", up);
+    T.el.addEventListener("pointercancel", up);
+  }
+
+  // ---------- render loop (sleeps when settled) ----------
+  let running = false, last = 0;
+  function wake() { if (!running) { running = true; last = performance.now(); requestAnimationFrame(frame); } }
+
+  function frame(now) {
+    const dt = Math.max(0, Math.min((now - last) / 1000, 0.05));
+    last = now;
+    const busy = stepAll(dt);
+    if (busy || toasts.some(t => t.dead)) requestAnimationFrame(frame);
+    else running = false;
+  }
+
+  function stepAll(dt) {
+    const V = VARIANTS[variant];
+    let busy = false;
+
+    for (let i = toasts.length - 1; i >= 0; i--) {
+      const T = toasts[i];
+      // springs: layout uses variant spring; drag-return + fade use fixed fast values
+      stepSpring(T.y, V.k, V.d, dt);
+      stepSpring(T.s, V.k, V.d, dt);
+      stepSpring(T.o, 500, 45, dt);
+      if (!T.dragging) stepSpring(T.x, 420, 34, dt);
+
+      // error shake: 3 decaying cycles after entrance
+      let shakeX = 0;
+      if (T.shakeT >= 0) {
+        T.shakeT += dt;
+        const p = T.shakeT / 0.3;
+        if (p < 1) { shakeX = Math.sin(p * Math.PI * 6) * 6 * (1 - p); busy = true; }
+        else T.shakeT = -1;
+      }
+
+      const o = Math.max(0, Math.min(1, T.o.v));
+      T.el.style.transform = `translate3d(${(T.x.v + shakeX).toFixed(2)}px, ${T.y.v.toFixed(2)}px, 0) scale(${T.s.v.toFixed(4)})`;
+      T.el.style.opacity = o.toFixed(3);
+
+      if (T.dead && o < 0.02) {
+        T.el.remove();
+        toasts.splice(i, 1);
+        layout();
+      }
+      if (!(settled(T.y) && settled(T.s) && settled(T.o) && (T.dragging || settled(T.x)))) busy = true;
+    }
+    return busy;
+  }
+
+  // ---------- triggers ----------
+  const MSGS = {
+    success: ["File saved", "portfolio-v2.fig · synced to cloud"],
+    error: ["Delete failed", "item is referenced by 3 boards"],
+  };
+  let spamN = 0;
+  document.querySelector(".row").addEventListener("click", e => {
+    const b = e.target.closest("[data-t]"); if (!b) return;
+    const t = b.dataset.t;
+    if (t === "spam") {
+      for (let i = 0; i < 5; i++) setTimeout(() => spawn(i % 3 === 2 ? "error" : "success", "Notification " + (++spamN), "interruption test — keep clicking"), i * 90);
+    } else if (t === "promise") {
+      spawn("promise", "Uploading photo…", "beach-sunset.jpg · 2.4 MB");
+    } else {
+      spawn(t, MSGS[t][0], MSGS[t][1]);
+    }
+  });
+
+  // ---------- debug hooks ----------
+  window.__spawn = (k = "success") => spawn(k, "Debug toast", "spawned via hook");
+  window.__expand = v => { expanded = !!v; if (expanded) pauseTimers(); else resumeTimers(); layout(); wake(); };
+  window.__setVariant = v => { variant = v; };
+  window.__dismissAll = () => toasts.forEach(t => dismiss(t, 0));
+  window.__settle = (n = 60) => {
+    for (let i = 0; i < n; i++) stepAll(1 / 60);
+  };
+  window.__count = () => toasts.filter(t => !t.dead).length;
+})();
+</script>
+</body>
+</html>

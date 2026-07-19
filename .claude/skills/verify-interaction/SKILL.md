@@ -9,7 +9,7 @@ Never call a build done on faith. Drive it, screenshot the key states, and check
 
 ## Core loop
 
-1. Serve the build's folder and open it in the browser preview (`preview_start`).
+1. Serve the build's folder over HTTP and open it in the browser preview: edit `.claude/launch.json` to point the `static` config's http-server at today's folder, then `preview_start` with `{name: "static"}`. **Never verify via the `file://` pane** — it renders a static-snapshot context where JS measurements lie (elements report 0 width / wrong heights, opaque cards composite transparently) and edits don't reliably reload.
 2. `read_console_messages` — zero errors is the bar.
 3. Screenshot each key state: initial, mid-interaction, completed/reward, and any idle loop.
 4. `resize_window` to mobile (375px) and re-check layout + the primary interaction.
